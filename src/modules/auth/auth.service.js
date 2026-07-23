@@ -1016,19 +1016,19 @@ export const getAdminDashboardData = async (adminId, branchId = null, monthStr =
 
   // Determine chart grouping logic
   const isOneMonth = chartPeriod === 1;
-  const dateFormatMember = isOneMonth ? "DATE_FORMAT(createdAt, '%d %b')" : "DATE_FORMAT(MIN(createdAt), '%b')";
+  const dateFormatMember = isOneMonth ? "DATE_FORMAT(MIN(createdAt), '%d %b')" : "DATE_FORMAT(MIN(createdAt), '%b')";
   const groupByMember = isOneMonth ? "DATE(createdAt)" : "YEAR(createdAt), MONTH(createdAt)";
   const orderByMember = isOneMonth ? "DATE(createdAt)" : "YEAR(createdAt), MONTH(createdAt)";
   
-  const dateFormatRevenue = isOneMonth ? "DATE_FORMAT(p.paymentDate, '%d %b')" : "DATE_FORMAT(MIN(p.paymentDate), '%b')";
+  const dateFormatRevenue = isOneMonth ? "DATE_FORMAT(MIN(p.paymentDate), '%d %b')" : "DATE_FORMAT(MIN(p.paymentDate), '%b')";
   const groupByRevenue = isOneMonth ? "DATE(p.paymentDate)" : "YEAR(p.paymentDate), MONTH(p.paymentDate)";
   const orderByRevenue = isOneMonth ? "DATE(p.paymentDate)" : "YEAR(p.paymentDate), MONTH(p.paymentDate)";
 
-  const dateFormatExpense = isOneMonth ? "DATE_FORMAT(e.date, '%d %b')" : "DATE_FORMAT(MIN(e.date), '%b')";
+  const dateFormatExpense = isOneMonth ? "DATE_FORMAT(MIN(e.date), '%d %b')" : "DATE_FORMAT(MIN(e.date), '%b')";
   const groupByExpense = isOneMonth ? "DATE(e.date)" : "YEAR(e.date), MONTH(e.date)";
   const orderByExpense = isOneMonth ? "DATE(e.date)" : "YEAR(e.date), MONTH(e.date)";
 
-  const dateFormatSalary = isOneMonth ? "DATE_FORMAT(s.periodEnd, '%d %b')" : "DATE_FORMAT(MIN(s.periodEnd), '%b')";
+  const dateFormatSalary = isOneMonth ? "DATE_FORMAT(MIN(s.periodEnd), '%d %b')" : "DATE_FORMAT(MIN(s.periodEnd), '%b')";
   const groupBySalary = isOneMonth ? "DATE(s.periodEnd)" : "YEAR(s.periodEnd), MONTH(s.periodEnd)";
   const orderBySalary = isOneMonth ? "DATE(s.periodEnd)" : "YEAR(s.periodEnd), MONTH(s.periodEnd)";
 
