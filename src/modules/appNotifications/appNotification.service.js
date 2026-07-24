@@ -121,13 +121,21 @@ export const createAppNotification = async ({
  * Fetch paginated user notifications, safely scoped by tenant and receiver ID/Role.
  */
 export const getUserNotifications = async (tenantId, receiverId, receiverRole, limit = 20, offset = 0) => {
+  const isSuperAdmin = receiverRole === 'Superadmin' || receiverRole === 'Super Admin';
+  const roleCondition = isSuperAdmin ? "(receiverRole = 'Superadmin' OR receiverRole = 'Super Admin')" : "receiverRole = ?";
+  
   const sql = `
     SELECT * FROM app_notification
-    WHERE tenantId = ? AND receiverId = ? AND receiverRole = ?
+    WHERE tenantId = ? AND receiverId = ? AND ${roleCondition}
     ORDER BY createdAt DESC
     LIMIT ? OFFSET ?
   `;
-  const [rows] = await pool.query(sql, [tenantId, receiverId, receiverRole, parseInt(limit), parseInt(offset)]);
+  
+  const params = isSuperAdmin 
+    ? [tenantId, receiverId, parseInt(limit), parseInt(offset)]
+    : [tenantId, receiverId, receiverRole, parseInt(limit), parseInt(offset)];
+
+  const [rows] = await pool.query(sql, params);
   return rows.map(r => ({
     ...r,
     metadata: r.metadata ? (typeof r.metadata === 'string' ? JSON.parse(r.metadata) : r.metadata) : null
@@ -138,11 +146,19 @@ export const getUserNotifications = async (tenantId, receiverId, receiverRole, l
  * Get unread count for a user.
  */
 export const getUnreadCount = async (tenantId, receiverId, receiverRole) => {
+  const isSuperAdmin = receiverRole === 'Superadmin' || receiverRole === 'Super Admin';
+  const roleCondition = isSuperAdmin ? "(receiverRole = 'Superadmin' OR receiverRole = 'Super Admin')" : "receiverRole = ?";
+
   const sql = `
     SELECT COUNT(*) as count FROM app_notification
-    WHERE tenantId = ? AND receiverId = ? AND receiverRole = ? AND isRead = FALSE
+    WHERE tenantId = ? AND receiverId = ? AND ${roleCondition} AND isRead = FALSE
   `;
-  const [rows] = await pool.query(sql, [tenantId, receiverId, receiverRole]);
+  
+  const params = isSuperAdmin 
+    ? [tenantId, receiverId]
+    : [tenantId, receiverId, receiverRole];
+
+  const [rows] = await pool.query(sql, params);
   return rows[0].count;
 };
 

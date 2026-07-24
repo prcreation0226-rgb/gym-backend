@@ -71,7 +71,7 @@ export const createPurchase = async (req, res) => {
           eventKey: data.isUpgrade ? 'PLAN_UPGRADE_REQUEST' : 'PLAN_PURCHASED',
           tenantId: superAdmin.id,
           receiverId: superAdmin.id,
-          receiverRole: 'Super Admin',
+          receiverRole: 'Superadmin',
           receiverEmail: superAdmin.email,
           receiverPhone: superAdmin.phone,
           variables: data.isUpgrade ? {

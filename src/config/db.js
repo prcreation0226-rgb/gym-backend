@@ -139,12 +139,20 @@ pool
         );
       }
 
-      // Force-update PLAN_UPGRADE_REQUEST for existing live DBs that already had the bad template seeded
+      // Force-update for existing live DBs that already had the bad template seeded
       const upgradeReq = defaultTemplates.find(t => t.key === 'PLAN_UPGRADE_REQUEST');
       if (upgradeReq) {
         await connection.query(
           "UPDATE message_templates SET subject = ?, message = ?, variables = ?, channel = 'EMAIL,IN_APP' WHERE eventKey = 'PLAN_UPGRADE_REQUEST'",
           [upgradeReq.subject, upgradeReq.message, upgradeReq.vars]
+        );
+      }
+      
+      const purchaseReq = defaultTemplates.find(t => t.key === 'PLAN_PURCHASED');
+      if (purchaseReq) {
+        await connection.query(
+          "UPDATE message_templates SET subject = ?, message = ?, variables = ?, channel = 'EMAIL,IN_APP' WHERE eventKey = 'PLAN_PURCHASED'",
+          [purchaseReq.subject, purchaseReq.message, purchaseReq.vars]
         );
       }
       console.log("✅ Default message templates seeded.");
