@@ -74,7 +74,13 @@ export const createPurchase = async (req, res) => {
           receiverRole: 'Super Admin',
           receiverEmail: superAdmin.email,
           receiverPhone: superAdmin.phone,
-          variables: {
+          variables: data.isUpgrade ? {
+            AdminName: purchase.fullName || purchase.companyName || "Admin",
+            GymName: purchase.companyName || "Gym",
+            CurrentPlan: "Current Plan", // Optionally map from DB if available, else generic
+            RequestedPlan: purchase.selectedPlan || "N/A",
+            DateTime: dateStr
+          } : {
             Name: purchase.fullName || purchase.companyName || "Admin",
             PlanName: purchase.selectedPlan || "N/A"
           },

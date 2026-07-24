@@ -110,7 +110,7 @@ pool
         { key: 'TRIAL_EXPIRED_FINAL', name: 'Trial Expired', subject: 'Trial Expired', message: 'Hi {Name}, your trial has expired.', vars: '["Name"]' },
         { key: 'SUBSCRIPTION_ACTIVATED', name: 'Subscription Activated', subject: 'Subscription Activated', message: 'Hi {Name}, your {PlanName} is active.', vars: '["Name", "PlanName"]' },
         { key: 'PLAN_PURCHASED', name: 'Plan Purchased', subject: 'Plan Purchased', message: 'Hi {Name}, you purchased {PlanName}.', vars: '["Name", "PlanName"]' },
-        { key: 'PLAN_UPGRADE_REQUEST', name: 'Plan Upgrade Request', subject: 'Upgrade Request', message: 'Hi {Name}, upgrade requested for {PlanName}.', vars: '["Name", "PlanName"]' },
+        { key: 'PLAN_UPGRADE_REQUEST', name: 'Plan Upgrade Request', subject: 'New Plan Upgrade Request', message: 'Admin: {AdminName}\\nGym: {GymName}\\nCurrent Plan: {CurrentPlan}\\nRequested Plan: {RequestedPlan}\\nBilling: Monthly / Yearly\\nRequested At: {DateTime}\\nStatus: Pending', vars: '["AdminName", "GymName", "CurrentPlan", "RequestedPlan", "DateTime"]' },
         { key: 'PLAN_UPGRADED', name: 'Plan Upgraded', subject: 'Plan Upgraded', message: 'Hi {Name}, your plan was upgraded to {PlanName}.', vars: '["Name", "PlanName"]' },
         { key: 'MEMBER_CREATED', name: 'Member Created', subject: 'Welcome!', message: 'Hi {Name}, your account is created.', vars: '["Name"]' },
         { key: 'MEMBER_PLAN_ASSIGNED', name: 'Plan Assigned', subject: 'Plan Assigned', message: 'Hi {Name}, {PlanName} has been assigned to you.', vars: '["Name", "PlanName"]' },
@@ -132,8 +132,8 @@ pool
 
       for (const t of defaultTemplates) {
         await connection.query(
-          "INSERT IGNORE INTO message_templates (eventKey, name, subject, message, variables) VALUES (?, ?, ?, ?, ?)",
-          [t.key, t.name, t.subject, t.message, t.vars]
+          "INSERT IGNORE INTO message_templates (eventKey, name, subject, message, variables, channel) VALUES (?, ?, ?, ?, ?, ?)",
+          [t.key, t.name, t.subject, t.message, t.vars, 'EMAIL,IN_APP']
         );
       }
       console.log("✅ Default message templates seeded.");
