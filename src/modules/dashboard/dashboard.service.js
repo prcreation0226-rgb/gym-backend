@@ -71,16 +71,11 @@ export const dashboardService = async () => {
   const [branchLeaderboardRows] = await conn.query(
     `SELECT 
        b.name AS branch,
-       COALESCE(SUM(p.amount), 0) AS revenue,
-       COUNT(m.id) AS new
+       COALESCE((SELECT SUM(amount) FROM payment p JOIN member m ON p.memberId = m.id WHERE m.branchId = b.id AND p.paymentDate >= ?), 0) AS revenue,
+       COALESCE((SELECT COUNT(*) FROM member m WHERE m.branchId = b.id AND m.joinDate >= ?), 0) AS new
      FROM branch b
-     LEFT JOIN member m 
-       ON m.branchId = b.id AND m.joinDate >= ?
-     LEFT JOIN payment p 
-       ON p.memberId = m.id
-     GROUP BY b.id
      ORDER BY revenue DESC`,
-    [monthStartStr]
+    [monthStartStr, monthStartStr]
   );
   const branchLeaderboard = branchLeaderboardRows.map(b => ({
     branch: b.branch,
@@ -228,11 +223,9 @@ export const superAdminDashboardService = async (branchId = null) => {
     `SELECT 
         b.id AS branchId,
         b.name AS branchName,
-        SUM(m.amountPaid) AS revenue,
-        COUNT(m.id) AS newMembers
+        COALESCE((SELECT SUM(amount) FROM payment p JOIN member m ON p.memberId = m.id WHERE m.branchId = b.id), 0) AS revenue,
+        COALESCE((SELECT COUNT(*) FROM member m WHERE m.branchId = b.id), 0) AS newMembers
      FROM branch b
-     LEFT JOIN member m ON m.branchId = b.id
-     GROUP BY b.id
      ORDER BY revenue DESC`
   );
 

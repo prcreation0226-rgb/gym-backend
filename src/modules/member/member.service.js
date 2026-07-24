@@ -221,6 +221,17 @@ export const createMemberService = async (data) => {
           membershipTo: planEndDate,
         });
 
+        // ✅ Also record this in the payment table for revenue tracking
+        const actualAmount = amountPerPlan || plan.price;
+        if (Number(actualAmount) > 0) {
+          const invoiceNo = "INV-" + Date.now() + "-" + Math.floor(Math.random() * 999);
+          await pool.query(
+            `INSERT INTO payment (memberId, planId, amount, invoiceNo, paymentDate, collectedByName) 
+             VALUES (?, ?, ?, ?, NOW(), ?)`,
+            [memberId, planIdNum, actualAmount, invoiceNo, "Admin"]
+          );
+        }
+
         console.log(`✅ Successfully inserted plan ${planIdNum}, assignment ID: ${assignResult.insertId}`);
       } catch (insertError) {
         console.error(`❌ Error inserting plan ${planIdNum}:`, insertError.message);
@@ -422,6 +433,17 @@ export const renewMembershipService = async (memberId, body) => {
         adminId || member.adminId || null,
       ]
     );
+
+    // ✅ Also record this in the payment table for revenue tracking
+    const actualAmount = amountPaid || plan.price;
+    if (Number(actualAmount) > 0) {
+      const invoiceNo = "INV-" + Date.now() + "-" + Math.floor(Math.random() * 999);
+      await pool.query(
+        `INSERT INTO payment (memberId, planId, amount, invoiceNo, paymentDate, collectedByName) 
+         VALUES (?, ?, ?, ?, NOW(), ?)`,
+        [memberId, planId, actualAmount, invoiceNo, "Admin"]
+      );
+    }
   }
 
   const [[updatedMember]] = await pool.query(
