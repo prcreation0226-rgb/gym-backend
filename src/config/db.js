@@ -142,21 +142,23 @@ pool
       }
 
       // Force-update for existing live DBs that already had the bad template seeded
-      const upgradeReq = defaultTemplates.find(t => t.key === 'PLAN_UPGRADE_REQUEST');
-      if (upgradeReq) {
-        await connection.query(
-          "UPDATE message_templates SET subject = ?, message = ?, variables = ?, channel = 'EMAIL,IN_APP' WHERE eventKey = 'PLAN_UPGRADE_REQUEST'",
-          [upgradeReq.subject, upgradeReq.message, upgradeReq.vars]
-        );
+      const templatesToForceUpdate = [
+        'PLAN_UPGRADE_REQUEST', 
+        'PLAN_PURCHASED', 
+        'PLAN_UPGRADED', 
+        'SUBSCRIPTION_ACTIVATED'
+      ];
+      
+      for (const eventKey of templatesToForceUpdate) {
+        const tmpl = defaultTemplates.find(t => t.key === eventKey);
+        if (tmpl) {
+          await connection.query(
+            "UPDATE message_templates SET subject = ?, message = ?, variables = ?, channel = 'EMAIL,IN_APP' WHERE eventKey = ?",
+            [tmpl.subject, tmpl.message, tmpl.vars, eventKey]
+          );
+        }
       }
       
-      const purchaseReq = defaultTemplates.find(t => t.key === 'PLAN_PURCHASED');
-      if (purchaseReq) {
-        await connection.query(
-          "UPDATE message_templates SET subject = ?, message = ?, variables = ?, channel = 'EMAIL,IN_APP' WHERE eventKey = 'PLAN_PURCHASED'",
-          [purchaseReq.subject, purchaseReq.message, purchaseReq.vars]
-        );
-      }
       console.log("✅ Default message templates seeded.");
 
     } catch (e) {
