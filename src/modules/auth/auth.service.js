@@ -158,6 +158,17 @@ export const registerUser = async (data,payload) => {
     }).catch(err => console.error("❌ Error sending admin welcome email:", err.message));
   }
 
+  // ✅ Send IN-APP Welcome Notification to Dashboard
+  if (roleId == 2 || roleId == '2') {
+    try {
+      await pool.query(
+        "INSERT INTO app_notification (tenantId, receiverId, receiverRole, type, title, message, referenceType, referenceId, isRead, createdAt) VALUES (?, ?, 'Admin', 'SYSTEM_ALERT', 'Welcome to Speed Fitness!', ?, 'SYSTEM', '1', FALSE, NOW())",
+        [result.insertId, result.insertId, `Hi ${fullName}, welcome aboard! We are excited to have ${gymName || 'your gym'} with us. Let's get started!`]
+      );
+    } catch (e) {
+      console.error("❌ Failed to insert in-app welcome notification:", e.message);
+    }
+  }
   // Return full user object
   const newUser = {
     id: result.insertId,
