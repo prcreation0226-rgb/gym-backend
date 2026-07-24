@@ -23,6 +23,8 @@ export const createBookingRequest = async (req, res) => {
       email,
       phone,
       gender,
+      address,
+      dateOfBirth,
       adminId,
       branchId = null,
       planId,
@@ -34,21 +36,18 @@ export const createBookingRequest = async (req, res) => {
     /* -------------------------
        1️⃣ BASIC VALIDATION
     ------------------------- */
-    if (userId) {
-      if (!adminId || !planId || !price) {
-        return res.status(400).json({
-          success: false,
-          message: "adminId, planId and price are required"
-        });
-      }
-    } else {
-      if (!fullName || !phone || !gender || !adminId || !planId || !price) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "fullName, phone, gender, adminId, planId and price are required"
-        });
-      }
+    if (!adminId || !planId || !price) {
+      return res.status(400).json({
+        success: false,
+        message: "adminId, planId and price are required"
+      });
+    }
+
+    if (!userId && (!fullName || !phone || !gender)) {
+      return res.status(400).json({
+        success: false,
+        message: "fullName, phone, and gender are required for new bookings"
+      });
     }
 
     await connection.beginTransaction();
@@ -69,11 +68,31 @@ export const createBookingRequest = async (req, res) => {
       });
     }
 
-    if (userId) {
-      // EXISTING USER FLOW:
+    let targetUserId = userId;
+    let targetMemberId = null;
+    let isNewUser = false;
+    let resolvedFullName = fullName;
+
+    /* -------------------------
+       3️⃣ RESOLVE USER & MEMBER
+    ------------------------- */
+    if (!targetUserId && phone) {
+      // Look up by phone
+      const [[existingUser]] = await connection.query(
+        `SELECT id, fullName FROM user WHERE phone = ? AND adminId = ?`,
+        [phone, adminId]
+      );
+      if (existingUser) {
+        targetUserId = existingUser.id;
+        if (!resolvedFullName) resolvedFullName = existingUser.fullName;
+      }
+    }
+
+    if (targetUserId) {
+      // Existing User Flow
       const [[existingUserCheck]] = await connection.query(
-        `SELECT id FROM user WHERE id = ?`,
-        [userId]
+        `SELECT id, fullName, email, phone FROM user WHERE id = ?`,
+        [targetUserId]
       );
 
       if (!existingUserCheck) {
@@ -83,101 +102,56 @@ export const createBookingRequest = async (req, res) => {
           message: "User not found"
         });
       }
+      
+      if (!resolvedFullName) resolvedFullName = existingUserCheck.fullName;
 
-      // Check if they are already a member
       const [[existingMember]] = await connection.query(
         `SELECT id FROM member WHERE userId = ?`,
-        [userId]
+        [targetUserId]
       );
-      const existingMemberId = existingMember ? existingMember.id : null;
+      targetMemberId = existingMember ? existingMember.id : null;
+      
+    } else {
+      // Create New User Flow
+      isNewUser = true;
+      const plainPassword = generate6DigitPassword();
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-      const [bookingResult] = await connection.query(
+      const [userResult] = await connection.query(
         `
-        INSERT INTO booking_requests
-          (adminId, userId, memberId, planId, price, branchId, upiId, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+        INSERT INTO \`user\`
+          (adminId, fullName, email, phone, gender, address, dateOfBirth, roleId, branchId, password, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Inactive')
         `,
         [
           adminId,
-          userId,
-          existingMemberId,
-          planId,
-          price,
+          resolvedFullName,
+          email || null,
+          phone,
+          gender || null,
+          address || null,
+          dateOfBirth ? new Date(dateOfBirth) : null,
+          4,              // MEMBER role
           branchId,
-          upiId
+          hashedPassword
         ]
       );
-
-      await connection.commit();
-
-      return res.status(201).json({
-        success: true,
-        message: "Booking request submitted successfully",
-        data: {
-          bookingRequestId: bookingResult.insertId,
-          userId,
-          planName: plan.name,
-          price,
-          bookingStatus: "pending"
-        }
-      });
-    }
-
-    // GUEST USER FLOW (Original Flow):
-    /* -------------------------
-       3️⃣ PREVENT DUPLICATE USER
-    ------------------------- */
-    const [[existingUser]] = await connection.query(
-      `SELECT id FROM user WHERE phone = ? AND adminId = ?`,
-      [phone, adminId]
-    );
-
-    if (existingUser) {
-      await connection.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "User with this phone already exists"
-      });
+      targetUserId = userResult.insertId;
     }
 
     /* -------------------------
-       4️⃣ CREATE USER (Inactive + Password)
-    ------------------------- */
-    const plainPassword = generate6DigitPassword();
-    const hashedPassword = await bcrypt.hash(plainPassword, 10);
-
-    const [userResult] = await connection.query(
-      `
-      INSERT INTO \`user\`
-        (adminId, fullName, email, phone, gender, roleId, branchId, password, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Inactive')
-      `,
-      [
-        adminId,
-        fullName,
-        email || null,
-        phone,
-        gender,
-        4,              // MEMBER role
-        branchId,
-        hashedPassword
-      ]
-    );
-
-    const insertedUserId = userResult.insertId;
-
-    /* -------------------------
-       5️⃣ CREATE BOOKING REQUEST
+       4️⃣ CREATE BOOKING REQUEST
     ------------------------- */
     const [bookingResult] = await connection.query(
       `
       INSERT INTO booking_requests
         (adminId, userId, memberId, planId, price, branchId, upiId, status)
-      VALUES (?, ?, NULL, ?, ?, ?, ?, 'pending')
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
       `,
       [
         adminId,
-        insertedUserId,
+        targetUserId,
+        targetMemberId,
         planId,
         price,
         branchId,
@@ -187,19 +161,32 @@ export const createBookingRequest = async (req, res) => {
 
     await connection.commit();
 
+    /* -------------------------
+       5️⃣ EMIT SOCKET NOTIFICATION TO ADMIN
+    ------------------------- */
+    try {
+      emitToUser(adminId, "new_booking_request", {
+        message: `New plan purchase request from ${resolvedFullName || phone}`,
+        bookingRequestId: bookingResult.insertId,
+        planName: plan.name,
+      });
+    } catch (socketErr) {
+      console.error("Socket emit error:", socketErr);
+    }
+
     return res.status(201).json({
       success: true,
       message: "Booking request submitted successfully",
       data: {
         bookingRequestId: bookingResult.insertId,
-        userId: insertedUserId,
-        userName: fullName,
+        userId: targetUserId,
+        userName: resolvedFullName,
         phone,
         email,
         planName: plan.name,
         price,
         bookingStatus: "pending",
-        userStatus: "Inactive"
+        userStatus: isNewUser ? "Inactive" : "Active (Existing)"
       }
     });
 
@@ -299,7 +286,7 @@ export const approveBookingRequest = async (req, res) => {
     /* 1️⃣ Fetch booking + user */
     const [[booking]] = await connection.query(
       `
-      SELECT br.*, u.fullName, u.email, u.phone, u.gender
+      SELECT br.*, u.fullName, u.email, u.phone, u.gender, u.address, u.dateOfBirth
       FROM booking_requests br
       JOIN user u ON u.id = br.userId
       WHERE br.id = ? AND br.status = 'pending'
@@ -388,9 +375,9 @@ export const approveBookingRequest = async (req, res) => {
       const [memberResult] = await connection.query(
         `
         INSERT INTO member
-          (userId, adminId, fullName, email, phone, gender, planId, branchId,
+          (userId, adminId, fullName, email, phone, gender, address, dateOfBirth, planId, branchId,
            password, membershipFrom, membershipTo, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
         `,
         [
           booking.userId,
@@ -399,6 +386,8 @@ export const approveBookingRequest = async (req, res) => {
           booking.email,
           booking.phone,
           booking.gender,
+          booking.address,
+          booking.dateOfBirth,
           booking.planId,
           booking.branchId,
           hashedPassword,
