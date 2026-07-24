@@ -1,7 +1,9 @@
 import { uploadToCloudinary } from "../../config/cloudinary.js";
 import { registerUser, loginUser , fetchUserById,
   modifyUser,
-  removeUser, fetchAdmins, fetchDashboardStats, loginMemberService,changeUserPassword, getAdminDashboardData} from "./auth.service.js";
+  removeUser, fetchAdmins, fetchDashboardStats, loginMemberService,changeUserPassword, getAdminDashboardData,
+  forgotPasswordService, verifyOtpService, resendOtpService, resetPasswordService
+} from "./auth.service.js";
 
 
 
@@ -208,6 +210,46 @@ export const getAdminDashboard = async (req, res, next) => {
       message: "Dashboard data fetched successfully",
       data,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const result = await forgotPasswordService(email, req.ip, req.headers['user-agent']);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const verifyForgotPasswordOtp = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+    const result = await verifyOtpService(email, otp);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const resendForgotPasswordOtp = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const result = await resendOtpService(email, req.ip, req.headers['user-agent']);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { email, resetToken, newPassword, confirmPassword } = req.body;
+    const result = await resetPasswordService(email, resetToken, newPassword, confirmPassword);
+    res.json(result);
   } catch (err) {
     next(err);
   }

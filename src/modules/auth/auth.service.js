@@ -6,6 +6,8 @@ import { ENV } from "../../config/env.js";
 import { notifySuperAdmin } from "../notifications/notif.service.js";
 import { uploadToCloudinary } from "../../config/cloudinary.js";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
+import crypto from "crypto";
+import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
 
 /**************************************
  * REGISTER USER (CREATE)
@@ -1303,3 +1305,222 @@ const recentActivitiesQuery = `
 };
 
 
+
+// --- FORGOT PASSWORD FLOW ---
+
+const logAuthAudit = async (email, event, ipAddress, userAgent, details) => {
+  try {
+    await pool.query(
+      "INSERT INTO auth_audit_log (email, event, ipAddress, userAgent, details) VALUES (?, ?, ?, ?, ?)",
+      [email, event, ipAddress, userAgent, JSON.stringify(details)]
+    );
+  } catch (err) {
+    console.error("Audit log failed:", err.message);
+  }
+};
+
+const getAccountByEmail = async (email) => {
+  // Check user table
+  const [users] = await pool.query("SELECT id, email, fullName, companyName, roleId, adminId FROM user WHERE email = ?", [email]);
+  // Check member table
+  const [members] = await pool.query("SELECT id, email, name, adminId FROM member WHERE email = ?", [email]);
+
+  if (users.length > 0 && members.length > 0) {
+    throw new Error("Multiple accounts found with this email. Please contact support.");
+  }
+
+  if (users.length > 0) return { type: 'USER', data: users[0], id: users[0].id, name: users[0].fullName || users[0].companyName || 'User' };
+  if (members.length > 0) return { type: 'MEMBER', data: members[0], id: members[0].id, name: members[0].name || 'Member' };
+
+  return null;
+};
+
+export const forgotPasswordService = async (email, ip, userAgent) => {
+  try {
+    // 1. Rate Limiting: Max 5 requests per hour
+    const [recentRequests] = await pool.query(
+      "SELECT COUNT(*) as count FROM password_reset_otp WHERE email = ? AND createdAt >= NOW() - INTERVAL 1 HOUR",
+      [email]
+    );
+    
+    if (recentRequests[0].count >= 5) {
+      await logAuthAudit(email, 'OTP_FAILED', ip, userAgent, { reason: 'Rate limit exceeded' });
+      return { success: true, message: "If an account with this email exists, an OTP has been sent." }; // Enumeration protection
+    }
+
+    const account = await getAccountByEmail(email);
+    if (!account) {
+      await logAuthAudit(email, 'OTP_FAILED', ip, userAgent, { reason: 'Account not found' });
+      return { success: true, message: "If an account with this email exists, an OTP has been sent." }; // Enumeration protection
+    }
+
+    // 2. Generate OTP
+    const rawOtp = crypto.randomInt(100000, 999999).toString();
+    const hashedOtp = await bcrypt.hash(rawOtp, 10);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // 3. Save to DB
+    await pool.query(
+      `INSERT INTO password_reset_otp 
+       (userId, userType, email, otp, expiresAt, createdByIP, userAgent) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [account.id, account.type, email, hashedOtp, expiresAt, ip, userAgent]
+    );
+
+    // 4. Send Email via Notification Service
+    try {
+      await sendTemplatedNotification({
+        eventKey: 'FORGOT_PASSWORD_OTP',
+        tenantId: account.type === 'USER' ? (account.data.roleId === 1 ? account.id : account.data.adminId || account.id) : account.data.adminId || 1,
+        receiverId: account.id,
+        receiverRole: account.type === 'USER' ? 'Admin/Staff' : 'Member',
+        receiverEmail: email,
+        receiverPhone: null,
+        variables: {
+          Name: account.name,
+          OTP: rawOtp,
+          CompanyName: 'Gym Management'
+        }
+      });
+      await logAuthAudit(email, 'OTP_GENERATED', ip, userAgent, { success: true });
+    } catch (err) {
+      await logAuthAudit(email, 'SMTP_FAILURE', ip, userAgent, { reason: err.message });
+      // DO NOT CRASH, continue to return generic success
+    }
+
+    return { success: true, message: "If an account with this email exists, an OTP has been sent." };
+  } catch (error) {
+    // Hide DB errors from API, return generic response
+    console.error("Forgot password error:", error.message);
+    if (error.message.includes("Multiple accounts")) {
+      throw new Error(error.message);
+    }
+    return { success: true, message: "If an account with this email exists, an OTP has been sent." };
+  }
+};
+
+export const verifyOtpService = async (email, rawOtp) => {
+  const [otps] = await pool.query(
+    "SELECT * FROM password_reset_otp WHERE email = ? AND isUsed = FALSE ORDER BY id DESC LIMIT 1",
+    [email]
+  );
+
+  if (otps.length === 0) {
+    return { success: false, message: "Invalid or expired OTP." };
+  }
+
+  const record = otps[0];
+
+  if (new Date() > new Date(record.expiresAt)) {
+    return { success: false, message: "OTP has expired." };
+  }
+
+  if (record.attempts >= 5) {
+    return { success: false, message: "Maximum attempts reached. Please request a new OTP." };
+  }
+
+  await pool.query("UPDATE password_reset_otp SET attempts = attempts + 1 WHERE id = ?", [record.id]);
+
+  const isValid = await bcrypt.compare(rawOtp, record.otp);
+  if (!isValid) {
+    return { success: false, message: "Invalid OTP." };
+  }
+
+  const rawResetToken = crypto.randomBytes(32).toString('hex');
+  const hashedResetToken = await bcrypt.hash(rawResetToken, 10);
+  const tokenExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+  await pool.query(
+    "UPDATE password_reset_otp SET isVerified = TRUE, resetToken = ?, tokenExpiresAt = ? WHERE id = ?",
+    [hashedResetToken, tokenExpiresAt, record.id]
+  );
+  
+  await logAuthAudit(email, 'OTP_VERIFIED', null, null, { success: true });
+
+  return { 
+    success: true, 
+    message: "OTP Verified successfully.",
+    resetToken: rawResetToken 
+  };
+};
+
+export const resendOtpService = async (email, ip, userAgent) => {
+  const [recent] = await pool.query(
+    "SELECT id FROM password_reset_otp WHERE email = ? AND createdAt >= NOW() - INTERVAL 60 SECOND",
+    [email]
+  );
+
+  if (recent.length > 0) {
+    return { success: false, message: "Please wait 60 seconds before requesting a new OTP." };
+  }
+
+  await pool.query("UPDATE password_reset_otp SET isUsed = TRUE WHERE email = ? AND isUsed = FALSE", [email]);
+
+  return await forgotPasswordService(email, ip, userAgent);
+};
+
+export const resetPasswordService = async (email, resetToken, newPassword, confirmPassword) => {
+  if (newPassword !== confirmPassword) {
+    return { success: false, message: "Passwords do not match." };
+  }
+
+  const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[\\W_]).{8,}$/;
+  if (!passRegex.test(newPassword)) {
+    return { success: false, message: "Password must be at least 8 characters, include uppercase, lowercase, number, and special character." };
+  }
+
+  const [otps] = await pool.query(
+    "SELECT * FROM password_reset_otp WHERE email = ? AND isVerified = TRUE AND isUsed = FALSE ORDER BY id DESC LIMIT 1",
+    [email]
+  );
+
+  if (otps.length === 0) {
+    return { success: false, message: "Invalid or expired reset token." };
+  }
+
+  const record = otps[0];
+  if (!record.resetToken || new Date() > new Date(record.tokenExpiresAt)) {
+    return { success: false, message: "Reset token has expired. Please request a new OTP." };
+  }
+
+  const isValidToken = await bcrypt.compare(resetToken, record.resetToken);
+  if (!isValidToken) {
+    return { success: false, message: "Invalid reset token." };
+  }
+
+  const account = await getAccountByEmail(email);
+  if (!account) {
+    return { success: false, message: "Account not found." };
+  }
+
+  const table = account.type === 'USER' ? 'user' : 'member';
+  const [dbUser] = await pool.query(`SELECT password FROM ${table} WHERE id = ?`, [account.id]);
+  const isSamePassword = await bcrypt.compare(newPassword, dbUser[0].password);
+  
+  if (isSamePassword) {
+    return { success: false, message: "New password cannot be the same as your current password." };
+  }
+
+  const newHashedPassword = await bcrypt.hash(newPassword, 10);
+  await pool.query(`UPDATE ${table} SET password = ? WHERE id = ?`, [newHashedPassword, account.id]);
+
+  await pool.query("UPDATE password_reset_otp SET isUsed = TRUE WHERE id = ?", [record.id]);
+  
+  await logAuthAudit(email, 'PASSWORD_CHANGED', null, null, { success: true });
+
+  try {
+    await sendTemplatedNotification({
+      eventKey: 'PASSWORD_CHANGED',
+      tenantId: account.type === 'USER' ? (account.data.roleId === 1 ? account.id : account.data.adminId || account.id) : account.data.adminId || 1,
+      receiverId: account.id,
+      receiverRole: account.type === 'USER' ? 'Admin/Staff' : 'Member',
+      receiverEmail: email,
+      receiverPhone: null,
+      variables: {}
+    });
+  } catch (err) {
+    console.error("Password Changed notification failed:", err.message);
+  }
+
+  return { success: true, message: "Password updated successfully. Please log in with your new password." };
+};

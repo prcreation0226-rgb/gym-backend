@@ -1,8 +1,9 @@
 import jwt from "jsonwebtoken";
 import { ENV } from "../config/env.js";
+import { pool } from "../config/db.js";
 
 export const verifyToken = (roles = []) => {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     try {
       const authHeader = req.headers.authorization || req.headers['Authorization'];
       if (!authHeader) throw { status: 401, message: "Token required" };
@@ -42,6 +43,12 @@ export const verifyToken = (roles = []) => {
         if (!isAllowed) {
           throw { status: 403, message: "Access denied" };
         }
+      }
+
+      // Token Blacklist check (Forced Session Invalidation after password reset)
+      const [blacklisted] = await pool.query("SELECT id FROM token_blacklist WHERE token = ? LIMIT 1", [token]);
+      if (blacklisted.length > 0) {
+        throw { status: 401, message: "Session expired. Please log in again." };
       }
 
       next();

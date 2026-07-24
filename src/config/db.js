@@ -128,6 +128,8 @@ pool
         { key: 'SESSION_CREATED', name: 'Session Created', subject: 'New Session Booked', message: 'Hi {Name}, a new session {SessionName} has been booked.', vars: '["Name", "SessionName"]' },
         { key: 'SESSION_UPDATED', name: 'Session Updated', subject: 'Session Updated', message: 'Hi {Name}, the session {SessionName} has been updated.', vars: '["Name", "SessionName"]' },
         { key: 'SESSION_CANCELLED', name: 'Session Cancelled', subject: 'Session Cancelled', message: 'Hi {Name}, the session {SessionName} has been cancelled.', vars: '["Name", "SessionName"]' },
+        { key: 'FORGOT_PASSWORD_OTP', name: 'Forgot Password OTP', subject: 'Password Reset OTP', message: 'Hi {Name},\\n\\nYour OTP is\\n{OTP}\\n\\nIt will expire in\\n10 Minutes.\\n\\nIf you did not request this,\\nplease ignore this email.', vars: '["Name", "OTP", "CompanyName"]' },
+        { key: 'PASSWORD_CHANGED', name: 'Password Changed', subject: 'Password Changed Successfully', message: 'Your account password has been changed successfully.\\n\\nIf this was not you, please contact your administrator immediately.', vars: '[]' },
       ];
 
       for (const t of defaultTemplates) {
@@ -210,9 +212,57 @@ pool
           archivedAt DATETIME DEFAULT CURRENT_TIMESTAMP
         );
       `);
-      console.log("✅ Tables notification_queue, notification_delivery_log, and app_notification_archive created or verified.");
+
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS password_reset_otp (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          userId INT NOT NULL,
+          userType ENUM('USER', 'MEMBER') NOT NULL,
+          email VARCHAR(255) NOT NULL,
+          otp VARCHAR(255) NOT NULL,
+          resetToken VARCHAR(255) NULL,
+          purpose VARCHAR(50) DEFAULT 'PASSWORD_RESET',
+          expiresAt DATETIME NOT NULL,
+          tokenExpiresAt DATETIME NULL,
+          attempts INT DEFAULT 0,
+          isVerified BOOLEAN DEFAULT FALSE,
+          isUsed BOOLEAN DEFAULT FALSE,
+          lastSentAt DATETIME NULL,
+          createdByIP VARCHAR(45),
+          userAgent VARCHAR(255),
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_email (email),
+          INDEX idx_otp (otp),
+          INDEX idx_resetToken (resetToken),
+          INDEX idx_expiresAt (expiresAt)
+        );
+      `);
+
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS auth_audit_log (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          email VARCHAR(255) NOT NULL,
+          event VARCHAR(100) NOT NULL,
+          ipAddress VARCHAR(45),
+          userAgent VARCHAR(255),
+          details TEXT,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS token_blacklist (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          token VARCHAR(500) NOT NULL,
+          blacklistedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_token (token(255))
+        );
+      `);
+
+      console.log("✅ Tables notification_queue, notification_delivery_log, app_notification_archive, password_reset_otp, auth_audit_log, token_blacklist created or verified.");
     } catch (e) {
-      console.error("❌ Failed to create enterprise notification tables:", e.message);
+      console.error("❌ Failed to create enterprise tables:", e.message);
     }
 
     connection.release();

@@ -9,7 +9,11 @@ import {
   getAdmins,
   loginMember,
   changePasswordController,
-  getAdminDashboard
+  getAdminDashboard,
+  forgotPassword,
+  verifyForgotPasswordOtp,
+  resendForgotPasswordOtp,
+  resetPassword
 } from "./auth.controller.js";
 import { verifyToken } from "../../middlewares/auth.js";
 
@@ -19,6 +23,12 @@ router.post("/register", register);
 router.post("/login", login);
 router.post("/login-member", loginMember);
 router.post("/logout", (req, res) => res.json({ success: true, message: "Logged out successfully" }));
+
+// Forgot Password Flow
+router.post("/forgot-password", forgotPassword);
+router.post("/verify-forgot-password-otp", verifyForgotPasswordOtp);
+router.post("/resend-forgot-password-otp", resendForgotPasswordOtp);
+router.post("/reset-password", resetPassword);
 
 router.get("/user/:id", verifyToken(), getUserById);
 router.put("/user/:id", verifyToken(), updateUser);

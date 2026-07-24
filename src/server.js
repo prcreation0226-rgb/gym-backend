@@ -5,6 +5,7 @@ import "./modules/notifications/notif.corn.js";
 import { initTrialCronJobs } from "./cron/trial.cron.js";
 import { initNotificationQueueCron } from "./cron/notificationQueue.cron.js";
 import { initNotificationCleanupCron } from "./cron/notificationCleanup.cron.js";
+import { initOtpCleanupCron } from "./cron/otpCleanup.cron.js";
 import { initSocket } from "./config/socket.js";
 
 import { pool } from "./config/db.js";
@@ -13,6 +14,7 @@ import { pool } from "./config/db.js";
 initTrialCronJobs();
 initNotificationQueueCron();
 initNotificationCleanupCron();
+initOtpCleanupCron();
 
 (async () => {
   try {
