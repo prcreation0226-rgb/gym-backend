@@ -136,6 +136,15 @@ pool
           [t.key, t.name, t.subject, t.message, t.vars, 'EMAIL,IN_APP']
         );
       }
+
+      // Force-update PLAN_UPGRADE_REQUEST for existing live DBs that already had the bad template seeded
+      const upgradeReq = defaultTemplates.find(t => t.key === 'PLAN_UPGRADE_REQUEST');
+      if (upgradeReq) {
+        await connection.query(
+          "UPDATE message_templates SET subject = ?, message = ?, variables = ?, channel = 'EMAIL,IN_APP' WHERE eventKey = 'PLAN_UPGRADE_REQUEST'",
+          [upgradeReq.subject, upgradeReq.message, upgradeReq.vars]
+        );
+      }
       console.log("✅ Default message templates seeded.");
 
     } catch (e) {
