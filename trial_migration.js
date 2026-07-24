@@ -40,33 +40,7 @@ async function runMigration() {
     }
     console.log("automation_settings table ready.");
 
-    // 3. Create Message Templates Table
-    console.log("Creating message_templates table...");
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS message_templates (
-        id INT PRIMARY KEY AUTO_INCREMENT,
-        templateType VARCHAR(50) UNIQUE NOT NULL,
-        subject VARCHAR(255) NOT NULL,
-        messageBody TEXT NOT NULL,
-        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Insert default templates
-    const templates = [
-      { type: 'WELCOME_TRIAL', subject: 'Welcome to Your Gym Software Trial!', body: 'Hi {Name}, your {Days}-day free trial has started. Enjoy!' },
-      { type: 'EXPIRY_REMINDER_DAILY', subject: 'Your Trial is Expiring Soon', body: 'Hi {Name}, your trial expires on {Date}. Please purchase a subscription to keep access.' },
-      { type: 'TRIAL_EXPIRED_FINAL', subject: 'Your Trial Has Expired', body: 'Hi {Name}, your trial has expired. Your account is now inactive. Please upgrade.' },
-      { type: 'SUBSCRIPTION_ACTIVATED', subject: 'Welcome Aboard!', body: 'Hi {Name}, thank you for purchasing a subscription. Your account is fully active!' }
-    ];
-
-    for (const t of templates) {
-      await pool.query(`
-        INSERT IGNORE INTO message_templates (templateType, subject, messageBody) 
-        VALUES (?, ?, ?)
-      `, [t.type, t.subject, t.body]);
-    }
-    console.log("message_templates table ready.");
+    // 3. (Removed) Message Templates Table creation is now handled by src/config/db.js
 
     console.log("Migration completed successfully.");
     process.exit(0);
