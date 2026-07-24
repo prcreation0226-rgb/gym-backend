@@ -1,6 +1,7 @@
 import { pool } from "../../config/db.js"; // make sure it's a mysql2/promise pool
 import nodemailer from "nodemailer";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
+import { createAppNotification } from "../appNotifications/appNotification.service.js";
 import { emitToUser } from "../../config/socket.js";
 
 /**
@@ -296,7 +297,7 @@ export const broadcastAnnouncementService = async ({
 }) => {
   // 1. Fetch target users who are active and match target roles
   const [users] = await pool.query(
-    `SELECT id, fullName, email, phone 
+    `SELECT id, fullName, email, phone, roleId, adminId 
      FROM user 
      WHERE roleId IN (?) AND status = 'Active'`,
     [targetRoles]
@@ -333,6 +334,19 @@ export const broadcastAnnouncementService = async ({
         message: imageUrl ? `${message}\n\n📎 Attachment: ${imageUrl}` : message,
         customChannels: channels
       }).catch(err => console.error(`❌ Async dispatch error for user ${user.id}:`, err.message));
+      
+      // APP NOTIFICATION
+      createAppNotification({
+        tenantId: user.roleId === 1 ? user.id : (user.adminId || user.id), // usually user.id for Admins
+        receiverId: user.id,
+        receiverRole: user.roleId === 2 ? 'Admin' : (user.roleId === 1 ? 'Super Admin' : 'Staff'),
+        type: 'ANNOUNCEMENT_CREATED',
+        title: 'Announcement',
+        message: imageUrl ? `${subject}\n\n${message}\n\n📎 Attachment: ${imageUrl}` : `${subject}\n\n${message}`,
+        referenceType: 'ANNOUNCEMENT',
+        referenceId: null,
+        actionUrl: '/admin/announcements',
+      }).catch(err => console.error(`❌ APP NOTIF error:`, err.message));
       
       successCount++;
     } catch (err) {
@@ -426,6 +440,19 @@ export const adminBroadcastAnnouncementService = async ({
         message: imageUrl ? `${message}\n\n📎 Attachment: ${imageUrl}` : message,
         customChannels: channels
       }).catch(err => console.error(`❌ Async dispatch error:`, err.message));
+      
+      // APP NOTIFICATION
+      createAppNotification({
+        tenantId: adminId, 
+        receiverId: user.id,
+        receiverRole: user.role === "MEMBER" ? 'Member' : 'Staff',
+        type: 'ANNOUNCEMENT_CREATED',
+        title: 'Announcement',
+        message: imageUrl ? `${subject}\n\n${message}\n\n📎 Attachment: ${imageUrl}` : `${subject}\n\n${message}`,
+        referenceType: 'ANNOUNCEMENT',
+        referenceId: null,
+        actionUrl: user.role === "MEMBER" ? '/member/announcements' : '/staff/announcements',
+      }).catch(err => console.error(`❌ APP NOTIF error:`, err.message));
       
       successCount++;
     } catch (err) {

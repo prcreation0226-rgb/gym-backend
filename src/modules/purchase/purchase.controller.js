@@ -4,6 +4,7 @@ import { dispatchNotification } from "../../utils/notificationDispatcher.js";
 import { uploadToCloudinary } from "../../config/cloudinary.js";
 import bcrypt from "bcryptjs";
 import { notifySuperAdmin } from "../notifications/notif.service.js";
+import { createAppNotification } from "../appNotifications/appNotification.service.js";
 
 export const createPurchase = async (req, res) => {
   try {
@@ -87,6 +88,33 @@ Start Date: ${dateStr}`;
           subject: `New ${isTrialPlan ? 'Free Trial' : 'Purchase'} Registration Request`,
           message: message,
         });
+
+        // NEW APP NOTIFICATION LOGIC
+        if (data.isUpgrade) {
+          await createAppNotification({
+            tenantId: superAdmin.id,
+            receiverId: superAdmin.id,
+            receiverRole: 'Super Admin',
+            type: 'PLAN_UPGRADE_REQUEST',
+            title: 'Plan Upgrade Request',
+            message: `${purchase.fullName || "Admin"} requested upgrade.\n\nCurrent Plan: Basic\nRequested Plan: ${purchase.selectedPlan}\nBilling: ${purchase.billingDuration}`,
+            referenceType: 'SUBSCRIPTION',
+            referenceId: purchase.id?.toString(),
+            actionUrl: '/admin/subscription',
+          });
+        } else {
+          await createAppNotification({
+            tenantId: superAdmin.id,
+            receiverId: superAdmin.id,
+            receiverRole: 'Super Admin',
+            type: 'PLAN_PURCHASED',
+            title: 'New Subscription Purchased',
+            message: `Admin: ${purchase.fullName || "N/A"}\nCompany: ${purchase.companyName || "N/A"}\nPlan: ${purchase.selectedPlan}\nBilling: ${purchase.billingDuration}\nAmount: ₹${purchase.amount || 0}\nStatus: Active`,
+            referenceType: 'SUBSCRIPTION',
+            referenceId: purchase.id?.toString(),
+            actionUrl: '/admin/subscription',
+          });
+        }
       }
     } catch (notifErr) {
       console.error("Failed to send notification to Super Admin:", notifErr);
@@ -192,6 +220,19 @@ Thank you for staying with us!`;
             message: messageBody,
           });
 
+          // APP NOTIFICATION
+          await createAppNotification({
+            tenantId: existingUser.adminId || existingUser.id,
+            receiverId: existingUser.id,
+            receiverRole: 'Admin',
+            type: 'PLAN_UPGRADED',
+            title: 'Subscription Upgraded',
+            message: `Congratulations!\n\nYour subscription has been upgraded successfully.\n\nPlan: ${data.selectedPlan}\nValid Until: ${newExpiryDate.toLocaleDateString('en-GB')}`,
+            referenceType: 'SUBSCRIPTION',
+            referenceId: id.toString(),
+            actionUrl: '/admin/subscription',
+          });
+
         } else {
           // USER DOES NOT EXIST: Create New Admin Account
           const tempPassword = data.password || data.visiblePassword || req.body.password || `Gym@${Math.floor(1000 + Math.random() * 9000)}`;
@@ -252,9 +293,8 @@ Thank you for staying with us!`;
           ]);
 
           const newUserId = result.insertId;
-
-          // Dispatch Welcome Credentials Notification
-          const messageBody = `🎉 Welcome to Gym Management!
+          const newAdminId = newUserId;
+          const welcomeBody = `🎉 Welcome to Speed Fitness!
 Your Gym Owner account has been created successfully.
 
 Login Details:
@@ -264,13 +304,27 @@ Temporary Password: ${tempPassword}
 
 Please log in and change your password immediately under settings.`;
 
+          // Dispatch Welcome Credentials Notification
           await dispatchNotification({
             category: "welcome_note",
             toEmail: data.email,
             toPhone: data.phone,
             toUserId: newUserId,
-            subject: "Your Gym Owner Account is Active!",
-            message: messageBody,
+            subject: `Welcome to Speed Fitness! (${data.selectedPlan})`,
+            message: welcomeBody,
+          });
+
+          // APP NOTIFICATION
+          await createAppNotification({
+            tenantId: newAdminId,
+            receiverId: newAdminId,
+            receiverRole: 'Admin',
+            type: 'SUBSCRIPTION_ACTIVATED',
+            title: 'SUBSCRIPTION ACTIVATED',
+            message: `Hi ${data.adminName || "Admin"},\n\nThank you for purchasing your subscription.\n\nYour account has been activated successfully.\n\nPlan: ${data.selectedPlan}\nExpiry: ${expiryDate.toLocaleDateString('en-GB')}\n\nEnjoy using the platform.`,
+            referenceType: 'SUBSCRIPTION',
+            referenceId: id.toString(),
+            actionUrl: '/',
           });
 
           // Dispatch Subscription Invoice for Paid Plan manually approved

@@ -1,6 +1,7 @@
 import { pool } from "../../config/db.js";
 import XLSX from "xlsx";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
+import { createAppNotification } from "../appNotifications/appNotification.service.js";
 
 /**************************************
  * CREATE MEMBER
@@ -256,6 +257,19 @@ export const createMemberService = async (data) => {
     subject: "Welcome to Our Gym! 🏋️‍♂️",
     message: welcomeMsg,
   }).catch(err => console.error("Error sending welcome note notification:", err.message));
+
+  // APP NOTIFICATION
+  createAppNotification({
+    tenantId: adminId || userId,
+    receiverId: userId,
+    receiverRole: 'Member',
+    type: 'MEMBER_CREATED',
+    title: 'Welcome',
+    message: `Your account has been created.\n\nLogin using your registered credentials.\n\nGym: Speed Fitness`,
+    referenceType: 'MEMBER',
+    referenceId: memberId.toString(),
+    actionUrl: '/member-dashboard',
+  }).catch(err => console.error("Error creating APP NOTIFICATION:", err.message));
 
   // Send invoice receipt if paid during creation
   if (amountPaid && Number(amountPaid) > 0) {

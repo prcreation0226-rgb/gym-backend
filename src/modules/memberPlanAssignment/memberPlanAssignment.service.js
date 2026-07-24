@@ -1,4 +1,5 @@
 import { pool } from "../../config/db.js";
+import { createAppNotification } from "../appNotifications/appNotification.service.js";
 
 /**
  * Assign multiple plans to a member
@@ -12,7 +13,7 @@ export const assignPlansToMember = async (data) => {
   }
 
   // Verify member exists
-  const [[member]] = await pool.query("SELECT id, adminId, branchId FROM member WHERE id = ?", [memberId]);
+  const [[member]] = await pool.query("SELECT id, userId, adminId, branchId FROM member WHERE id = ?", [memberId]);
   if (!member) {
     throw { status: 404, message: "Member not found" };
   }
@@ -62,6 +63,21 @@ export const assignPlansToMember = async (data) => {
       paymentMode: paymentMode || null,
       amountPaid: amountPaid ? Number(amountPaid) : plan.price,
     });
+
+    // APP NOTIFICATION
+    if (member.userId) {
+      await createAppNotification({
+        tenantId: member.adminId || member.userId,
+        receiverId: member.userId,
+        receiverRole: 'Member',
+        type: 'MEMBER_PLAN_ASSIGNED',
+        title: 'Membership Activated',
+        message: `Congratulations!\n\nYour membership is now active.\n\nPlan: ${plan.name}\nStart Date: ${startDate.toLocaleDateString('en-GB')}\nExpiry: ${endDate.toLocaleDateString('en-GB')}\nAmount: ₹${amountPaid ? Number(amountPaid) : plan.price}\nStatus: Active`,
+        referenceType: 'PLAN_ASSIGNMENT',
+        referenceId: result.insertId.toString(),
+        actionUrl: '/member-dashboard',
+      }).catch(err => console.error("Error creating APP NOTIFICATION:", err.message));
+    }
   }
 
   return {
