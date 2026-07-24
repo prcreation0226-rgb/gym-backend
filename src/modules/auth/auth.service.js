@@ -743,6 +743,7 @@ export const fetchAdmins = async () => {
     FROM user u
     LEFT JOIN role r ON r.id = u.roleId
     WHERE u.roleId = 2
+    ORDER BY u.id DESC
   `;
 
   const [rows] = await pool.query(sql);
