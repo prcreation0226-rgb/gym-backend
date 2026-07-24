@@ -449,10 +449,11 @@ export const getUserAnnouncementsService = async (adminId, branchId, roleGroup) 
        SELECT a.*, u.fullName AS senderName 
        FROM announcement a
        LEFT JOIN user u ON u.id = a.sentBy
-       WHERE a.adminId = ? OR (a.adminId IS NULL AND a.sentBy IN (SELECT id FROM user WHERE roleId = 1))
+       WHERE (a.adminId = ? OR (a.adminId IS NULL AND a.sentBy IN (SELECT id FROM user WHERE roleId = 1)))
+         AND a.createdAt >= (SELECT createdAt FROM user WHERE id = ?)
        ORDER BY a.createdAt DESC
     `;
-    params = [adminId];
+    params = [adminId, adminId];
   } else {
     // Members and staff see only their own gym's announcements
     query = `
@@ -535,10 +536,11 @@ export const getPersonalNotifHistoryService = async (adminId) => {
       `SELECT pn.*, m.fullName AS memberName
        FROM personal_notification pn
        LEFT JOIN member m ON m.id = pn.memberId
-       WHERE pn.sentBy IN (SELECT id FROM user WHERE adminId = ? OR id = ?) OR pn.sentBy IS NULL
+       WHERE (pn.sentBy IN (SELECT id FROM user WHERE adminId = ? OR id = ?) OR pn.sentBy IS NULL)
+         AND pn.createdAt >= (SELECT createdAt FROM user WHERE id = ?)
        ORDER BY pn.createdAt DESC
        LIMIT 50`,
-      [adminId, adminId]
+      [adminId, adminId, adminId]
     );
     return rows;
   } catch (err) {
@@ -558,10 +560,11 @@ export const getPersonalNotifHistoryService = async (adminId) => {
         `SELECT pn.*, m.fullName AS memberName
          FROM personal_notification pn
          LEFT JOIN member m ON m.id = pn.memberId
-         WHERE pn.sentBy IN (SELECT id FROM user WHERE adminId = ? OR id = ?) OR pn.sentBy IS NULL
+         WHERE (pn.sentBy IN (SELECT id FROM user WHERE adminId = ? OR id = ?) OR pn.sentBy IS NULL)
+           AND pn.createdAt >= (SELECT createdAt FROM user WHERE id = ?)
          ORDER BY pn.createdAt DESC
          LIMIT 50`,
-        [adminId, adminId]
+        [adminId, adminId, adminId]
       );
       return rows;
     } catch (e) {
