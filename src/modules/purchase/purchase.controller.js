@@ -63,6 +63,14 @@ export const createPurchase = async (req, res) => {
         "SELECT id, email, phone FROM user WHERE roleId = 1 LIMIT 1"
       );
 
+      let currentPlanStr = "Current Plan";
+      if (data.isUpgrade && data.email) {
+        const [existing] = await pool.query("SELECT planName FROM user WHERE email = ? LIMIT 1", [data.email]);
+        if (existing.length > 0 && existing[0].planName) {
+          currentPlanStr = existing[0].planName;
+        }
+      }
+
       if (superAdmins && superAdmins.length > 0) {
         const superAdmin = superAdmins[0];
         const dateStr = purchase.startDate ? new Date(purchase.startDate).toLocaleDateString('en-GB') : "N/A";
@@ -75,13 +83,13 @@ export const createPurchase = async (req, res) => {
           receiverEmail: superAdmin.email,
           receiverPhone: superAdmin.phone,
           variables: data.isUpgrade ? {
-            AdminName: purchase.fullName || purchase.companyName || "Admin",
-            GymName: purchase.companyName || "Gym",
-            CurrentPlan: "Current Plan", // Optionally map from DB if available, else generic
+            AdminName: purchase.adminName || purchase.fullName || purchase.companyName || "Admin",
+            GymName: purchase.companyName || purchase.branchName || "Gym",
+            CurrentPlan: currentPlanStr,
             RequestedPlan: purchase.selectedPlan || "N/A",
             DateTime: dateStr
           } : {
-            Name: purchase.fullName || purchase.companyName || "Admin",
+            Name: purchase.adminName || purchase.fullName || purchase.companyName || "Admin",
             PlanName: purchase.selectedPlan || "N/A"
           },
           referenceType: 'SUBSCRIPTION',
