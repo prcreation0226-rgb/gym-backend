@@ -141,6 +141,17 @@ pool
         );
       }
 
+      // Temporarily override channels for critical notifications to ensure they always use IN_APP
+      try {
+        await connection.query(`
+          UPDATE message_templates
+          SET channel = 'EMAIL,IN_APP'
+          WHERE eventKey IN ('PLAN_UPGRADE_REQUEST', 'PLAN_UPGRADED', 'SUBSCRIPTION_ACTIVATED', 'ANNOUNCEMENT')
+        `);
+      } catch (err) {
+        console.warn("Could not enforce channels:", err.message);
+      }
+
       // Force-update for existing live DBs that already had the bad template seeded
       const templatesToForceUpdate = [
         'PLAN_UPGRADE_REQUEST', 
