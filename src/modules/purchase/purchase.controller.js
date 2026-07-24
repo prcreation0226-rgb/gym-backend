@@ -46,7 +46,7 @@ export const createPurchase = async (req, res) => {
     const purchase = await createPurchaseService(data);
 
     // Notify Super Admin real-time
-    notifySuperAdmin(`New Purchase Request: ${data.companyName || 'Gym'} - Plan: ${data.selectedPlan} (Rs.${data.amount || 0})`, 'IN-APP');
+    notifySuperAdmin(`New Purchase Request: ${data.companyName || 'Gym'} - Plan: ${data.selectedPlan} (Rs.${data.amount || 0})`, 'IN_APP');
 
 
 

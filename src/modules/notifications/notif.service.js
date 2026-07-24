@@ -192,13 +192,25 @@ import { formatISTDate } from "../../utils/dateHelper.js";
 
 export const getUserNotificationsService = async (userId) => {
   try {
-    const [rows] = await pool.query(
-      `SELECT * FROM notificationlog 
-       WHERE (\`to\` = ? OR \`to\` = 'all' OR \`to\` = 'staff') 
-         AND status IN ('UNREAD', 'PENDING')
-       ORDER BY createdAt DESC LIMIT 20`,
-      [userId.toString()]
-    );
+    // Fetch user role
+    const [uRows] = await pool.query(`SELECT roleId FROM user WHERE id = ? LIMIT 1`, [userId]);
+    const roleId = uRows.length > 0 ? uRows[0].roleId : null;
+
+    let queryStr = ``;
+    if (roleId === 1 || roleId === 9) {
+      // SuperAdmins and SubAdmins only see direct notifications, not gym-wide broadcasts
+      queryStr = `SELECT * FROM notificationlog 
+                  WHERE \`to\` = ? 
+                  AND status IN ('UNREAD', 'PENDING')
+                  ORDER BY createdAt DESC LIMIT 20`;
+    } else {
+      queryStr = `SELECT * FROM notificationlog 
+                  WHERE (\`to\` = ? OR \`to\` = 'all' OR \`to\` = 'staff') 
+                  AND status IN ('UNREAD', 'PENDING')
+                  ORDER BY createdAt DESC LIMIT 20`;
+    }
+
+    const [rows] = await pool.query(queryStr, [userId.toString()]);
     return rows.map(r => ({
       ...r,
       ...(formatISTDate ? formatISTDate(r.createdAt) : {})
@@ -211,12 +223,22 @@ export const getUserNotificationsService = async (userId) => {
 
 export const getAllUserNotificationsService = async (userId) => {
   try {
-    const [rows] = await pool.query(
-      `SELECT * FROM notificationlog 
-       WHERE (\`to\` = ? OR \`to\` = 'all' OR \`to\` = 'staff')
-       ORDER BY createdAt DESC LIMIT 100`,
-      [userId.toString()]
-    );
+    // Fetch user role
+    const [uRows] = await pool.query(`SELECT roleId FROM user WHERE id = ? LIMIT 1`, [userId]);
+    const roleId = uRows.length > 0 ? uRows[0].roleId : null;
+
+    let queryStr = ``;
+    if (roleId === 1 || roleId === 9) {
+      queryStr = `SELECT * FROM notificationlog 
+                  WHERE \`to\` = ?
+                  ORDER BY createdAt DESC LIMIT 100`;
+    } else {
+      queryStr = `SELECT * FROM notificationlog 
+                  WHERE (\`to\` = ? OR \`to\` = 'all' OR \`to\` = 'staff')
+                  ORDER BY createdAt DESC LIMIT 100`;
+    }
+
+    const [rows] = await pool.query(queryStr, [userId.toString()]);
     return rows.map(r => ({
       ...r,
       ...(formatISTDate ? formatISTDate(r.createdAt) : {})
