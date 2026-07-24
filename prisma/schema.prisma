@@ -710,10 +710,28 @@ model automation_settings {
 }
 
 model message_templates {
-  id           Int     @id @default(autoincrement())
-  templateType String? @unique @db.VarChar(100)
-  subject      String? @db.VarChar(255)
-  messageBody  String? @db.Text
+  id        Int      @id @default(autoincrement())
+  eventKey  String   @unique @db.VarChar(100)
+  name      String   @db.VarChar(255)
+  subject   String?  @db.VarChar(255)
+  message   String   @db.Text
+  channel   String   @default("EMAIL") @db.VarChar(100)
+  isActive  Boolean  @default(true)
+  variables Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model template_audit_logs {
+  id         Int      @id @default(autoincrement())
+  templateId Int
+  adminId    Int?
+  ipAddress  String?  @db.VarChar(45)
+  oldSubject String?  @db.VarChar(255)
+  newSubject String?  @db.VarChar(255)
+  oldMessage String?  @db.Text
+  newMessage String?  @db.Text
+  changedAt  DateTime @default(now())
 }
 
 model credit_packages {
@@ -1021,4 +1039,30 @@ model gym_equipment {
   isActive            Int       @default(1) @db.TinyInt
   createdAt           DateTime? @default(now()) @db.DateTime(0)
   updatedAt           DateTime? @default(now()) @updatedAt @db.DateTime(0)
+}
+
+model app_notification {
+  id            Int       @id @default(autoincrement())
+  tenantId      Int
+  senderId      Int?
+  receiverId    Int
+  receiverRole  String    @db.VarChar(50)
+  type          String    @db.VarChar(100)
+  title         String    @db.VarChar(255)
+  message       String    @db.Text
+  referenceType String?   @db.VarChar(100)
+  referenceId   String?   @db.VarChar(100)
+  actionUrl     String?   @db.VarChar(255)
+  metadata      Json?
+  isRead        Boolean   @default(false)
+  readAt        DateTime?
+  priority      String    @default("NORMAL") @db.VarChar(50)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@index([tenantId])
+  @@index([receiverId])
+  @@index([receiverRole])
+  @@index([createdAt])
+  @@index([isRead])
 }

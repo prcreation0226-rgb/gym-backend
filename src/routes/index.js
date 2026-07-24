@@ -1,4 +1,5 @@
 import { Router } from "express";
+import appNotificationRoutes from "../modules/appNotifications/appNotification.routes.js";
 import authRoutes from "../modules/auth/auth.routes.js";
 import branchRoutes from "../modules/branch/branch.routes.js";
 import staffRoutes from "../modules/staff/staff.routes.js";
@@ -46,6 +47,7 @@ import receptionistDashboardRoutes from "../modules/dashboard/receptionistDashbo
 import equipmentRoutes from "../modules/inventory/equipment.routes.js";
 import automationRoutes from "../modules/appSettings/automation.routes.js";
 import creditsRoutes from "../modules/credits/credits.routes.js";
+import messageTemplateRoutes from "../modules/messageTemplates/messageTemplate.routes.js";
 
 const router = Router();
 
@@ -103,5 +105,7 @@ router.use("/receptionist-dashboard", receptionistDashboardRoutes);
 router.use("/v1/equipment", equipmentRoutes);
 router.use("/v1/automation", automationRoutes);
 router.use("/v1/credits", creditsRoutes);
+router.use("/app-notifications", appNotificationRoutes);
+router.use("/v1/message-templates", messageTemplateRoutes);
 
 export default router;
