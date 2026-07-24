@@ -8,9 +8,19 @@ import {
   staffCheckIn,
   staffCheckOut,
   staffAttendanceList,
+  publicMemberCheckIn,
+  publicMemberCheckOut,
+  publicStaffCheckIn,
+  publicStaffCheckOut
 } from "./memberAttendance.controller.js   ";
 
 const router = Router();
+
+// PUBLIC ATTENDANCE (VIA QR URL)
+router.post("/public/member/checkin", publicMemberCheckIn);
+router.post("/public/member/checkout", publicMemberCheckOut);
+router.post("/public/staff/checkin", publicStaffCheckIn);
+router.post("/public/staff/checkout", publicStaffCheckOut);
 
 // MEMBER ATTENDANCE
 router.post(
