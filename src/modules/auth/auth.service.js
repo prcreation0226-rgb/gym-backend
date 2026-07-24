@@ -739,9 +739,13 @@ await pool.query(
  **************************************/
 export const fetchAdmins = async () => {
   const sql = `
-    SELECT u.*, r.name AS roleName 
+    SELECT u.*, r.name AS roleName,
+           p.category AS planCategory,
+           p.name AS planDisplayName,
+           p.duration AS planDuration
     FROM user u
     LEFT JOIN role r ON r.id = u.roleId
+    LEFT JOIN plan p ON LOWER(TRIM(p.name)) = LOWER(TRIM(u.planName))
     WHERE u.roleId = 2
     ORDER BY u.id DESC
   `;
