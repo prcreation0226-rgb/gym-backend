@@ -68,8 +68,8 @@ export const registerUser = async (data,payload) => {
   let welcomeTemplate = null;
 
   // Assuming roleId = 2 means Admin (Gym Owner)
-  // ONLY apply trial if subscriptionPlan is 'Trial'
-  const isTrialSelected = subscriptionPlan === 'Trial' || data.isTrial === true || data.isTrial === 'true' || data.isTrial === 1;
+  // ONLY apply trial if subscriptionPlan is 'Trial' or '7-Day Trial'
+  const isTrialSelected = subscriptionPlan === 'Trial' || subscriptionPlan === '7-Day Trial' || data.isTrial === true || data.isTrial === 'true' || data.isTrial === 1;
 
   if ((roleId === 2 || roleId === '2') && isTrialSelected) {
     const [settings] = await pool.query('SELECT * FROM automation_settings LIMIT 1');

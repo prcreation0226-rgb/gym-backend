@@ -205,7 +205,7 @@ Thank you for staying with us!`;
           let trialStartDate = null;
           let trialEndDate = null;
 
-          if (data.selectedPlan && data.selectedPlan.toLowerCase().includes("trial")) {
+          if (data.selectedPlan && (data.selectedPlan.toLowerCase().includes("trial") || data.selectedPlan.toLowerCase().includes("free") || data.amount == 0)) {
             trialStatus = "Active";
             trialStartDate = startDate;
             trialEndDate = expiryDate;
@@ -214,7 +214,7 @@ Thank you for staying with us!`;
           let subPlan = "Basic";
           if (data.selectedPlan) {
             const lowPlan = data.selectedPlan.toLowerCase();
-            if (lowPlan.includes("trial")) subPlan = "Trial";
+            if (lowPlan.includes("trial") || lowPlan.includes("free") || (data.amount == 0)) subPlan = "7-Day Trial";
             else if (lowPlan.includes("premium") || lowPlan.includes("pro")) subPlan = "Premium";
             else if (lowPlan.includes("growth")) subPlan = "Growth";
           }
