@@ -130,6 +130,8 @@ pool
         { key: 'SESSION_CANCELLED', name: 'Session Cancelled', subject: 'Session Cancelled', message: 'Hi {Name}, the session {SessionName} has been cancelled.', vars: '["Name", "SessionName"]' },
         { key: 'FORGOT_PASSWORD_OTP', name: 'Forgot Password OTP', subject: 'Password Reset OTP', message: 'Hi {Name},\\n\\nYour OTP is\\n{OTP}\\n\\nIt will expire in\\n10 Minutes.\\n\\nIf you did not request this,\\nplease ignore this email.', vars: '["Name", "OTP", "CompanyName"]' },
         { key: 'PASSWORD_CHANGED', name: 'Password Changed', subject: 'Password Changed Successfully', message: 'Your account password has been changed successfully.\\n\\nIf this was not you, please contact your administrator immediately.', vars: '[]' },
+        { key: 'PLAN_UPGRADED', name: 'Plan Upgraded', subject: 'Plan Upgraded', message: 'Hi {Name}, your plan has been successfully upgraded to {PlanName}.', vars: '["Name", "PlanName"]' },
+        { key: 'SUBSCRIPTION_ACTIVATED', name: 'Subscription Activated', subject: 'Subscription Activated', message: 'Hi {Name}, your subscription for {PlanName} has been successfully activated. You can now login at {LoginUrl}.\\nAmount Paid: {Amount}', vars: '["Name", "PlanName", "LoginUrl", "Amount"]' }
       ];
 
       for (const t of defaultTemplates) {
