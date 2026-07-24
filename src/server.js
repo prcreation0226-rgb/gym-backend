@@ -3,12 +3,16 @@ import { ENV } from "./config/env.js";
 import "./modules/alert/alert.corn.js";
 import "./modules/notifications/notif.corn.js";
 import { initTrialCronJobs } from "./cron/trial.cron.js";
+import { initNotificationQueueCron } from "./cron/notificationQueue.cron.js";
+import { initNotificationCleanupCron } from "./cron/notificationCleanup.cron.js";
 import { initSocket } from "./config/socket.js";
 
 import { pool } from "./config/db.js";
 
 // Initialize scheduled tasks
 initTrialCronJobs();
+initNotificationQueueCron();
+initNotificationCleanupCron();
 
 (async () => {
   try {

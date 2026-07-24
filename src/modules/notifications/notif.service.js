@@ -2,6 +2,7 @@ import { pool } from "../../config/db.js"; // make sure it's a mysql2/promise po
 import nodemailer from "nodemailer";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
 import { createAppNotification } from "../appNotifications/appNotification.service.js";
+import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
 import { emitToUser } from "../../config/socket.js";
 
 /**
@@ -322,36 +323,34 @@ export const broadcastAnnouncementService = async ({
   let successCount = 0;
   let failCount = 0;
 
-  // 3. Dispatch notifications asynchronously for each target user
-  for (const user of users) {
+  // 3. Dispatch notifications asynchronously for each target user by enqueuing them
+  if (users.length > 0) {
+    const queueValues = users.map(user => [
+      user.roleId === 1 ? user.id : (user.adminId || user.id), // tenantId
+      user.id, // receiverId
+      user.roleId === 2 ? 'Admin' : (user.roleId === 1 ? 'Super Admin' : 'Staff'), // receiverRole
+      'ANNOUNCEMENT', // type
+      subject, // title
+      JSON.stringify({
+        Name: user.fullName || "User",
+        Message: imageUrl ? `${message}\n\n📎 Attachment: ${imageUrl}` : message,
+        _receiverEmail: user.email,
+        _receiverPhone: user.phone
+      }), // message (variables + metadata)
+      'ANNOUNCEMENT', // referenceType
+      null, // referenceId
+      '/admin/announcements' // actionUrl
+    ]);
+
     try {
-      dispatchNotification({
-        category: "announcement",
-        toEmail: user.email,
-        toPhone: user.phone,
-        toUserId: user.id,
-        subject,
-        message: imageUrl ? `${message}\n\n📎 Attachment: ${imageUrl}` : message,
-        customChannels: channels
-      }).catch(err => console.error(`❌ Async dispatch error for user ${user.id}:`, err.message));
-      
-      // APP NOTIFICATION
-      createAppNotification({
-        tenantId: user.roleId === 1 ? user.id : (user.adminId || user.id), // usually user.id for Admins
-        receiverId: user.id,
-        receiverRole: user.roleId === 2 ? 'Admin' : (user.roleId === 1 ? 'Super Admin' : 'Staff'),
-        type: 'ANNOUNCEMENT_CREATED',
-        title: 'Announcement',
-        message: imageUrl ? `${subject}\n\n${message}\n\n📎 Attachment: ${imageUrl}` : `${subject}\n\n${message}`,
-        referenceType: 'ANNOUNCEMENT',
-        referenceId: null,
-        actionUrl: '/admin/announcements',
-      }).catch(err => console.error(`❌ APP NOTIF error:`, err.message));
-      
-      successCount++;
+      await pool.query(
+        `INSERT INTO notification_queue (tenantId, receiverId, receiverRole, type, title, message, referenceType, referenceId, actionUrl) VALUES ?`,
+        [queueValues]
+      );
+      successCount = users.length;
     } catch (err) {
-      console.error(`❌ Failed to initiate broadcast for user ${user.id}:`, err.message);
-      failCount++;
+      console.error("❌ Failed to bulk enqueue announcements:", err.message);
+      failCount = users.length;
     }
   }
 
@@ -429,34 +428,33 @@ export const adminBroadcastAnnouncementService = async ({
   let successCount = 0;
   let failCount = 0;
 
-  for (const user of targetUsers) {
+  if (targetUsers.length > 0) {
+    const queueValues = targetUsers.map(user => [
+      adminId, // tenantId
+      user.id, // receiverId
+      user.role === "MEMBER" ? 'Member' : 'Staff', // receiverRole
+      'ANNOUNCEMENT', // type
+      subject, // title
+      JSON.stringify({
+        Name: user.fullName || "User",
+        Message: imageUrl ? `${message}\n\n📎 Attachment: ${imageUrl}` : message,
+        _receiverEmail: user.email,
+        _receiverPhone: user.phone
+      }), // message (variables)
+      'ANNOUNCEMENT', // referenceType
+      null, // referenceId
+      user.role === "MEMBER" ? '/member/announcements' : '/staff/announcements' // actionUrl
+    ]);
+
     try {
-      dispatchNotification({
-        category: "announcement",
-        toEmail: user.email,
-        toPhone: user.phone,
-        toUserId: user.id,
-        subject,
-        message: imageUrl ? `${message}\n\n📎 Attachment: ${imageUrl}` : message,
-        customChannels: channels
-      }).catch(err => console.error(`❌ Async dispatch error:`, err.message));
-      
-      // APP NOTIFICATION
-      createAppNotification({
-        tenantId: adminId, 
-        receiverId: user.id,
-        receiverRole: user.role === "MEMBER" ? 'Member' : 'Staff',
-        type: 'ANNOUNCEMENT_CREATED',
-        title: 'Announcement',
-        message: imageUrl ? `${subject}\n\n${message}\n\n📎 Attachment: ${imageUrl}` : `${subject}\n\n${message}`,
-        referenceType: 'ANNOUNCEMENT',
-        referenceId: null,
-        actionUrl: user.role === "MEMBER" ? '/member/announcements' : '/staff/announcements',
-      }).catch(err => console.error(`❌ APP NOTIF error:`, err.message));
-      
-      successCount++;
+      await pool.query(
+        `INSERT INTO notification_queue (tenantId, receiverId, receiverRole, type, title, message, referenceType, referenceId, actionUrl) VALUES ?`,
+        [queueValues]
+      );
+      successCount = targetUsers.length;
     } catch (err) {
-      failCount++;
+      console.error("❌ Failed to bulk enqueue admin announcements:", err.message);
+      failCount = targetUsers.length;
     }
   }
 

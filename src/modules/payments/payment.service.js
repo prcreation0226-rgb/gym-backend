@@ -1,5 +1,5 @@
 import { pool } from "../../config/db.js";
-import { dispatchNotification } from "../../utils/notificationDispatcher.js";
+import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { assignPlansToMember } from "../memberPlanAssignment/memberPlanAssignment.service.js";
@@ -42,17 +42,21 @@ export const recordPaymentService = async (data) => {
   );
 
   // Trigger global notification dispatch based on Super Admin configurations
-  const receiptMsg = `Hi ${member.fullName}, \n\nThank you for your payment of Rs.${amount} for the ${plan.name} plan. \n\nYour membership is now active. Enjoy your workout! 💪\n\nRegards,\nGym Management`;
-  
-  dispatchNotification({
-    category: "invoice",
-    toEmail: member.email,
-    toPhone: member.phone,
-    toUserId: member.userId,
-    memberId: member.id,
-    subject: `Payment Receipt - ${plan.name}`,
-    message: receiptMsg,
-  }).catch(err => console.error("Error dispatching payment notification:", err.message));
+  await sendTemplatedNotification({
+    eventKey: 'PAYMENT_SUCCESS',
+    tenantId: member.adminId || member.userId,
+    receiverId: member.userId,
+    receiverRole: 'Member',
+    receiverEmail: member.email,
+    receiverPhone: member.phone,
+    variables: {
+      Name: member.fullName || "Member",
+      Amount: amount
+    },
+    referenceType: 'PAYMENT',
+    referenceId: invoiceNo,
+    actionUrl: '/member-dashboard/invoices'
+  });
 
   return {
     id: result.insertId,

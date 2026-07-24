@@ -1,5 +1,6 @@
 import { pool } from "../../config/db.js";
 import { createAppNotification } from "../appNotifications/appNotification.service.js";
+import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
 
 /**
  * Assign multiple plans to a member
@@ -66,16 +67,20 @@ export const assignPlansToMember = async (data) => {
 
     // APP NOTIFICATION
     if (member.userId) {
-      await createAppNotification({
+      await sendTemplatedNotification({
+        eventKey: 'MEMBER_PLAN_ASSIGNED',
         tenantId: member.adminId || member.userId,
         receiverId: member.userId,
         receiverRole: 'Member',
-        type: 'MEMBER_PLAN_ASSIGNED',
-        title: 'Membership Activated',
-        message: `Congratulations!\n\nYour membership is now active.\n\nPlan: ${plan.name}\nStart Date: ${startDate.toLocaleDateString('en-GB')}\nExpiry: ${endDate.toLocaleDateString('en-GB')}\nAmount: ₹${amountPaid ? Number(amountPaid) : plan.price}\nStatus: Active`,
+        receiverEmail: member.email,
+        receiverPhone: member.phone,
+        variables: {
+          Name: member.fullName || "Member",
+          PlanName: plan.name || "N/A"
+        },
         referenceType: 'PLAN_ASSIGNMENT',
         referenceId: result.insertId.toString(),
-        actionUrl: '/member-dashboard',
+        actionUrl: '/member-dashboard'
       }).catch(err => console.error("Error creating APP NOTIFICATION:", err.message));
     }
   }

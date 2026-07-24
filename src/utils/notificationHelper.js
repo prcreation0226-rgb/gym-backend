@@ -1,6 +1,7 @@
 import { pool } from "../config/db.js";
 import { getIO, emitToUser } from "../config/socket.js";
 import { formatISTDate } from "./dateHelper.js";
+import { createAppNotification } from "../modules/appNotifications/appNotification.service.js";
 
 export const sendAppNotification = async (to, message, options = {}) => {
   try {
@@ -13,47 +14,39 @@ export const sendAppNotification = async (to, message, options = {}) => {
       reference_id = null
     } = options;
 
-    const [result] = await pool.query(
-      `INSERT INTO notificationlog 
-      (type, \`to\`, message, status, title, receiver_role, sender_id, sender_role, reference_type, reference_id, is_read) 
-      VALUES ('IN-APP', ?, ?, 'UNREAD', ?, ?, ?, ?, ?, ?, FALSE)`,
-      [
-        to.toString(), 
-        message, 
-        title, 
-        receiver_role, 
-        sender_id, 
-        sender_role, 
-        reference_type, 
-        reference_id
-      ]
-    );
-    
-    const io = getIO();
-    if (io) {
-      const createdAt = new Date().toISOString();
-      const payload = {
-        id: result.insertId,
-        type: "IN-APP",
-        to: to.toString(),
-        message: message,
-        title,
-        receiver_role,
-        sender_id,
-        sender_role,
-        reference_type,
-        reference_id,
-        is_read: 0,
-        createdAt: createdAt,
-        ...formatISTDate(createdAt)
-      };
-      
-      if (to === "all") {
-        io.emit("new_notification", payload);
-      } else {
-        emitToUser(to, "new_notification", payload);
+    if (to === "all") {
+      // Just emit via socket for now if it's a global broadcast to all without persistence
+      const io = getIO();
+      if (io) {
+        io.emit("new_notification", { type: "IN-APP", message, title, createdAt: new Date().toISOString() });
       }
+      return;
     }
+
+    // Lookup user to get tenantId and precise role
+    const [[user]] = await pool.query("SELECT id, roleId, adminId FROM user WHERE id = ?", [to]);
+    if (user) {
+      let roleName = 'Member';
+      if (user.roleId === 1) roleName = 'Super Admin';
+      else if (user.roleId === 2) roleName = 'Admin';
+      else if (user.roleId === 3) roleName = 'Trainer';
+      else if (user.roleId === 4) roleName = 'Staff';
+
+      const tenantId = user.roleId === 1 ? user.id : (user.adminId || user.id);
+
+      await createAppNotification({
+        tenantId,
+        senderId: sender_id,
+        receiverId: user.id,
+        receiverRole: receiver_role || roleName,
+        type: title || 'SYSTEM',
+        title: title || 'Notification',
+        message: message,
+        referenceType: reference_type,
+        referenceId: reference_id ? reference_id.toString() : null
+      });
+    }
+
   } catch (err) {
     console.error("Failed to send app notification:", err);
   }

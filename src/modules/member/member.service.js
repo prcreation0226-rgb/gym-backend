@@ -1,7 +1,6 @@
 import { pool } from "../../config/db.js";
 import XLSX from "xlsx";
-import { dispatchNotification } from "../../utils/notificationDispatcher.js";
-import { createAppNotification } from "../appNotifications/appNotification.service.js";
+import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
 
 /**************************************
  * CREATE MEMBER
@@ -246,30 +245,22 @@ export const createMemberService = async (data) => {
   console.log(`✅ Total plans assigned: ${assignedPlans.length} out of ${plansToAssign.length} requested`);
 
   // Send welcome note using global channels configured by Super Admin
-  const welcomeMsg = `Hi ${fullName},\n\nWelcome to our gym! 🏋️‍♂️ Your membership is registered successfully.\n\nLogin credentials:\nEmail: ${memberEmail}\nPassword: ${userPassword}\n\nRegards,\nGym Management`;
-
-  dispatchNotification({
-    category: "welcome_note",
-    toEmail: memberEmail,
-    toPhone: phone,
-    toUserId: userId,
-    memberId: memberId,
-    subject: "Welcome to Our Gym! 🏋️‍♂️",
-    message: welcomeMsg,
-  }).catch(err => console.error("Error sending welcome note notification:", err.message));
-
-  // APP NOTIFICATION
-  createAppNotification({
+  await sendTemplatedNotification({
+    eventKey: 'MEMBER_CREATED',
     tenantId: adminId || userId,
     receiverId: userId,
     receiverRole: 'Member',
-    type: 'MEMBER_CREATED',
-    title: 'Welcome',
-    message: `Your account has been created.\n\nLogin using your registered credentials.\n\nGym: Speed Fitness`,
+    receiverEmail: memberEmail,
+    receiverPhone: phone,
+    variables: {
+      Name: fullName || "Member",
+      Email: memberEmail,
+      Password: userPassword
+    },
     referenceType: 'MEMBER',
     referenceId: memberId.toString(),
-    actionUrl: '/member-dashboard',
-  }).catch(err => console.error("Error creating APP NOTIFICATION:", err.message));
+    actionUrl: '/member-dashboard'
+  });
 
   // Send invoice receipt if paid during creation
   if (amountPaid && Number(amountPaid) > 0) {
@@ -278,17 +269,21 @@ export const createMemberService = async (data) => {
       planNames = assignedPlans.map(p => p.planName).join(", ");
     }
 
-    const invoiceMsg = `Hi ${fullName},\n\nThank you for your payment of Rs.${amountPaid} for the ${planNames} plan(s).\n\nYour membership is now active. Enjoy your workout! 💪\n\nRegards,\nGym Management`;
-
-    dispatchNotification({
-      category: "invoice",
-      toEmail: memberEmail,
-      toPhone: phone,
-      toUserId: userId,
-      memberId: memberId,
-      subject: "Payment Receipt",
-      message: invoiceMsg,
-    }).catch(err => console.error("Error sending invoice notification:", err.message));
+    await sendTemplatedNotification({
+      eventKey: 'PAYMENT_SUCCESS',
+      tenantId: adminId || userId,
+      receiverId: userId,
+      receiverRole: 'Member',
+      receiverEmail: memberEmail,
+      receiverPhone: phone,
+      variables: {
+        Name: fullName || "Member",
+        Amount: amountPaid
+      },
+      referenceType: 'PAYMENT',
+      referenceId: memberId.toString(),
+      actionUrl: '/member-dashboard/invoices'
+    });
   }
 
   return {

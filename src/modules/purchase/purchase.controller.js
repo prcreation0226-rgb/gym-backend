@@ -1,10 +1,8 @@
 import { createPurchaseService, getAllPurchasesService, modifyPurchaseStatus} from "./purchase.service.js";
 import { pool } from "../../config/db.js";
-import { dispatchNotification } from "../../utils/notificationDispatcher.js";
 import { uploadToCloudinary } from "../../config/cloudinary.js";
 import bcrypt from "bcryptjs";
-import { notifySuperAdmin } from "../notifications/notif.service.js";
-import { createAppNotification } from "../appNotifications/appNotification.service.js";
+import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
 
 export const createPurchase = async (req, res) => {
   try {
@@ -46,11 +44,6 @@ export const createPurchase = async (req, res) => {
 
     const purchase = await createPurchaseService(data);
 
-    // Notify Super Admin real-time
-    notifySuperAdmin(`New Purchase Request: ${data.companyName || 'Gym'} - Plan: ${data.selectedPlan} (Rs.${data.amount || 0})`, 'IN_APP');
-
-
-
     // If it is a Free Trial, DO NOT auto-approve. Leave as pending for SuperAdmin to review.
     const isTrialPlan = data.selectedPlan && data.selectedPlan.toLowerCase().includes("trial");
     if (isTrialPlan) {
@@ -73,48 +66,22 @@ export const createPurchase = async (req, res) => {
       if (superAdmins && superAdmins.length > 0) {
         const superAdmin = superAdmins[0];
         const dateStr = purchase.startDate ? new Date(purchase.startDate).toLocaleDateString('en-GB') : "N/A";
-        const message = `🔔 New ${isTrialPlan ? 'Free Trial' : 'Purchase'} Registration Alert!
-Gym Name: ${purchase.companyName || "N/A"}
-Email: ${purchase.email || "N/A"}
-Plan: ${purchase.selectedPlan || "N/A"}
-Billing Duration: ${purchase.billingDuration || "N/A"}
-Start Date: ${dateStr}`;
-
-        await dispatchNotification({
-          category: "free_trial_alert",
-          toEmail: superAdmin.email,
-          toPhone: superAdmin.phone,
-          toUserId: superAdmin.id,
-          subject: `New ${isTrialPlan ? 'Free Trial' : 'Purchase'} Registration Request`,
-          message: message,
+        
+        await sendTemplatedNotification({
+          eventKey: data.isUpgrade ? 'PLAN_UPGRADE_REQUEST' : 'PLAN_PURCHASED',
+          tenantId: superAdmin.id,
+          receiverId: superAdmin.id,
+          receiverRole: 'Super Admin',
+          receiverEmail: superAdmin.email,
+          receiverPhone: superAdmin.phone,
+          variables: {
+            Name: purchase.fullName || purchase.companyName || "Admin",
+            PlanName: purchase.selectedPlan || "N/A"
+          },
+          referenceType: 'SUBSCRIPTION',
+          referenceId: purchase.id?.toString(),
+          actionUrl: '/admin/subscription'
         });
-
-        // NEW APP NOTIFICATION LOGIC
-        if (data.isUpgrade) {
-          await createAppNotification({
-            tenantId: superAdmin.id,
-            receiverId: superAdmin.id,
-            receiverRole: 'Super Admin',
-            type: 'PLAN_UPGRADE_REQUEST',
-            title: 'Plan Upgrade Request',
-            message: `${purchase.fullName || "Admin"} requested upgrade.\n\nCurrent Plan: Basic\nRequested Plan: ${purchase.selectedPlan}\nBilling: ${purchase.billingDuration}`,
-            referenceType: 'SUBSCRIPTION',
-            referenceId: purchase.id?.toString(),
-            actionUrl: '/admin/subscription',
-          });
-        } else {
-          await createAppNotification({
-            tenantId: superAdmin.id,
-            receiverId: superAdmin.id,
-            receiverRole: 'Super Admin',
-            type: 'PLAN_PURCHASED',
-            title: 'New Subscription Purchased',
-            message: `Admin: ${purchase.fullName || "N/A"}\nCompany: ${purchase.companyName || "N/A"}\nPlan: ${purchase.selectedPlan}\nBilling: ${purchase.billingDuration}\nAmount: ₹${purchase.amount || 0}\nStatus: Active`,
-            referenceType: 'SUBSCRIPTION',
-            referenceId: purchase.id?.toString(),
-            actionUrl: '/admin/subscription',
-          });
-        }
       }
     } catch (notifErr) {
       console.error("Failed to send notification to Super Admin:", notifErr);
@@ -202,35 +169,21 @@ export const updatePurchaseStatus = async (req, res, next) => {
             [data.selectedPlan, data.amount || 0, actualPlanDuration, newExpiryDate, existingUser.id]
           );
 
-          // Notify upgrade approval
-          const invoiceUrl = `http://localhost:5000/api/v1/purchases/invoice/pdf/${id}`;
-          const messageBody = `🎉 Subscription Approved!
-Your request to renew/upgrade your gym plan to "${data.selectedPlan}" has been approved.
-
-Download Tax Invoice PDF: ${invoiceUrl}
-New Expiry Date: ${newExpiryDate.toLocaleDateString('en-GB')}
-Thank you for staying with us!`;
-
-          await dispatchNotification({
-            category: "invoice", // notify using invoice/payment channels
-            toEmail: data.email,
-            toPhone: data.phone,
-            toUserId: existingUser.id,
-            subject: "Gym Plan Upgrade Approved",
-            message: messageBody,
-          });
-
           // APP NOTIFICATION
-          await createAppNotification({
+          await sendTemplatedNotification({
+            eventKey: 'PLAN_UPGRADED',
             tenantId: existingUser.adminId || existingUser.id,
             receiverId: existingUser.id,
             receiverRole: 'Admin',
-            type: 'PLAN_UPGRADED',
-            title: 'Subscription Upgraded',
-            message: `Congratulations!\n\nYour subscription has been upgraded successfully.\n\nPlan: ${data.selectedPlan}\nValid Until: ${newExpiryDate.toLocaleDateString('en-GB')}`,
+            receiverEmail: data.email,
+            receiverPhone: data.phone,
+            variables: {
+              Name: data.adminName || data.companyName || "Admin",
+              PlanName: data.selectedPlan || "N/A"
+            },
             referenceType: 'SUBSCRIPTION',
             referenceId: id.toString(),
-            actionUrl: '/admin/subscription',
+            actionUrl: '/admin/subscription'
           });
 
         } else {
@@ -294,53 +247,25 @@ Thank you for staying with us!`;
 
           const newUserId = result.insertId;
           const newAdminId = newUserId;
-          const welcomeBody = `🎉 Welcome to Speed Fitness!
-Your Gym Owner account has been created successfully.
-
-Login Details:
-URL: http://localhost:5173/login
-Username/Email: ${data.email}
-Temporary Password: ${tempPassword}
-
-Please log in and change your password immediately under settings.`;
-
-          // Dispatch Welcome Credentials Notification
-          await dispatchNotification({
-            category: "welcome_note",
-            toEmail: data.email,
-            toPhone: data.phone,
-            toUserId: newUserId,
-            subject: `Welcome to Speed Fitness! (${data.selectedPlan})`,
-            message: welcomeBody,
-          });
-
           // APP NOTIFICATION
-          await createAppNotification({
+          await sendTemplatedNotification({
+            eventKey: 'SUBSCRIPTION_ACTIVATED',
             tenantId: newAdminId,
             receiverId: newAdminId,
             receiverRole: 'Admin',
-            type: 'SUBSCRIPTION_ACTIVATED',
-            title: 'SUBSCRIPTION ACTIVATED',
-            message: `Hi ${data.adminName || "Admin"},\n\nThank you for purchasing your subscription.\n\nYour account has been activated successfully.\n\nPlan: ${data.selectedPlan}\nExpiry: ${expiryDate.toLocaleDateString('en-GB')}\n\nEnjoy using the platform.`,
+            receiverEmail: data.email,
+            receiverPhone: data.phone,
+            variables: {
+              Name: data.adminName || data.companyName || "Admin",
+              PlanName: data.selectedPlan || "N/A",
+              Password: tempPassword,
+              LoginUrl: 'http://localhost:5173/login',
+              Amount: data.amount || 0
+            },
             referenceType: 'SUBSCRIPTION',
             referenceId: id.toString(),
-            actionUrl: '/',
+            actionUrl: '/'
           });
-
-          // Dispatch Subscription Invoice for Paid Plan manually approved
-          const isTrial = data.selectedPlan && data.selectedPlan.toLowerCase().includes("trial");
-          if (!isTrial) {
-            const invoiceMsg = `Hi ${data.companyName || "Gym Owner"}, \n\nThank you for purchasing the ${data.selectedPlan} plan. We have received your payment of Rs.${data.amount || 0}.\n\nYour Gym Owner account is active.\n\nTransaction ID: ${data.transactionId || 'N/A'}\n\nRegards,\nSpeed Fitness Team`;
-
-            await dispatchNotification({
-              category: "invoice",
-              toEmail: data.email,
-              toPhone: data.phone,
-              toUserId: newUserId,
-              subject: `Subscription Invoice - ${data.selectedPlan}`,
-              message: invoiceMsg,
-            }).catch(err => console.error("Error dispatching manual approval invoice notification:", err.message));
-          }
         }
       } catch (activationErr) {
         console.error("Failed auto-activating user on purchase approval:", activationErr);

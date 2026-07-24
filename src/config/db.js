@@ -122,6 +122,12 @@ pool
         { key: 'PASSWORD_RESET', name: 'Password Reset', subject: 'Password Reset', message: 'Hi {Name}, your password reset link is {Link}', vars: '["Name", "Link"]' },
         { key: 'LOGIN_ALERT', name: 'Login Alert', subject: 'New Login', message: 'Hi {Name}, a new login was detected from {IP}.', vars: '["Name", "IP"]' },
         { key: 'EMAIL_VERIFICATION', name: 'Email Verification', subject: 'Verify Email', message: 'Hi {Name}, please verify your email: {Link}', vars: '["Name", "Link"]' },
+        { key: 'CLASS_CREATED', name: 'Class Created', subject: 'New Class Schedule', message: 'Hi {Name}, a new class {ClassName} has been scheduled for {Date}.', vars: '["Name", "ClassName", "Date"]' },
+        { key: 'CLASS_UPDATED', name: 'Class Updated', subject: 'Class Schedule Updated', message: 'Hi {Name}, the class {ClassName} schedule has been updated.', vars: '["Name", "ClassName"]' },
+        { key: 'CLASS_CANCELLED', name: 'Class Cancelled', subject: 'Class Cancelled', message: 'Hi {Name}, the class {ClassName} has been cancelled.', vars: '["Name", "ClassName"]' },
+        { key: 'SESSION_CREATED', name: 'Session Created', subject: 'New Session Booked', message: 'Hi {Name}, a new session {SessionName} has been booked.', vars: '["Name", "SessionName"]' },
+        { key: 'SESSION_UPDATED', name: 'Session Updated', subject: 'Session Updated', message: 'Hi {Name}, the session {SessionName} has been updated.', vars: '["Name", "SessionName"]' },
+        { key: 'SESSION_CANCELLED', name: 'Session Cancelled', subject: 'Session Cancelled', message: 'Hi {Name}, the session {SessionName} has been cancelled.', vars: '["Name", "SessionName"]' },
       ];
 
       for (const t of defaultTemplates) {
@@ -136,6 +142,70 @@ pool
       console.error("❌ Failed to create message_templates tables:", e.message);
     }
     
+    try {
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS notification_queue (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          tenantId INT,
+          receiverId INT NOT NULL,
+          receiverRole VARCHAR(50),
+          type VARCHAR(100),
+          title VARCHAR(255),
+          message TEXT,
+          referenceType VARCHAR(100),
+          referenceId VARCHAR(100),
+          actionUrl VARCHAR(255),
+          status VARCHAR(50) DEFAULT 'PENDING',
+          retryCount INT DEFAULT 0,
+          processAfter DATETIME NULL,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_status (status),
+          INDEX idx_processAfter (processAfter)
+        );
+      `);
+
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS notification_delivery_log (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          notificationId INT,
+          tenantId INT,
+          receiverId INT,
+          status VARCHAR(50) DEFAULT 'CREATED',
+          errorReason TEXT,
+          createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_notificationId (notificationId),
+          INDEX idx_receiverId (receiverId)
+        );
+      `);
+
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS app_notification_archive (
+          id INT PRIMARY KEY,
+          tenantId INT,
+          senderId INT,
+          receiverId INT NOT NULL,
+          receiverRole VARCHAR(50),
+          type VARCHAR(100),
+          title VARCHAR(255),
+          message TEXT,
+          referenceType VARCHAR(100),
+          referenceId VARCHAR(100),
+          actionUrl VARCHAR(255),
+          metadata JSON,
+          priority VARCHAR(50) DEFAULT 'NORMAL',
+          isRead BOOLEAN DEFAULT FALSE,
+          readAt DATETIME NULL,
+          createdAt DATETIME,
+          archivedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      console.log("✅ Tables notification_queue, notification_delivery_log, and app_notification_archive created or verified.");
+    } catch (e) {
+      console.error("❌ Failed to create enterprise notification tables:", e.message);
+    }
+
     connection.release();
   })
   .catch((err) => {

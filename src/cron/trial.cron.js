@@ -1,6 +1,6 @@
 import cron from "node-cron";
 import { pool } from "../config/db.js";
-import { dispatchNotification } from "../utils/notificationDispatcher.js";
+import { sendTemplatedNotification } from "../modules/messageTemplates/messageTemplate.service.js";
 
 export const initTrialCronJobs = () => {
   // Run every day at 00:00 (Midnight)
@@ -22,30 +22,29 @@ export const initTrialCronJobs = () => {
       `);
 
       if (expiringUsers.length > 0) {
-        const [templates] = await pool.query("SELECT * FROM message_templates WHERE templateType = 'EXPIRY_REMINDER_DAILY'");
-        const reminderTemplate = templates.length > 0 ? templates[0] : null;
-
         for (const user of expiringUsers) {
           // If trial was Active but now end date passed, update to Expired
           if (user.trialStatus === 'Active' && new Date(user.trialEndDate) < today) {
             await pool.query("UPDATE user SET trialStatus = 'Expired' WHERE id = ?", [user.id]);
           }
 
-          if (reminderTemplate) {
-            let msgBody = reminderTemplate.messageBody
-              .replace('{Name}', user.fullName)
-              .replace('{Date}', new Date(user.trialEndDate).toLocaleDateString());
-
-            console.log(`[AUTOMATION - REMINDER] Dispatched to: ${user.email}`);
-            dispatchNotification({
-              category: "saas_renewal_channel",
-              toEmail: user.email,
-              toPhone: user.phone,
-              toUserId: user.id,
-              subject: reminderTemplate.subject || "Trial Expiry Reminder",
-              message: msgBody,
-            }).catch(err => console.error("Error dispatching daily expiry reminder:", err.message));
-          }
+          console.log(`[AUTOMATION - REMINDER] Dispatched to: ${user.email}`);
+          await sendTemplatedNotification({
+            eventKey: 'EXPIRY_REMINDER_DAILY',
+            tenantId: user.id,
+            receiverId: user.id,
+            receiverRole: 'Admin',
+            receiverEmail: user.email,
+            receiverPhone: user.phone,
+            variables: {
+              Name: user.fullName || "User",
+              PlanName: "Free Trial",
+              Days: "soon" // or dynamically calculate diff
+            },
+            referenceType: 'SUBSCRIPTION',
+            referenceId: user.id.toString(),
+            actionUrl: '/admin/subscription'
+          });
         }
       }
 
@@ -60,25 +59,24 @@ export const initTrialCronJobs = () => {
       `);
 
       if (expiredGracePeriodUsers.length > 0) {
-        const [templates] = await pool.query("SELECT * FROM message_templates WHERE templateType = 'TRIAL_EXPIRED_FINAL'");
-        const finalTemplate = templates.length > 0 ? templates[0] : null;
-
         for (const user of expiredGracePeriodUsers) {
           await pool.query("UPDATE user SET status = 'Inactive' WHERE id = ?", [user.id]);
 
-          if (finalTemplate) {
-            let msgBody = finalTemplate.messageBody.replace('{Name}', user.fullName);
-
-            console.log(`[AUTOMATION - DEACTIVATED] Dispatched to: ${user.email}`);
-            dispatchNotification({
-              category: "saas_renewal_channel",
-              toEmail: user.email,
-              toPhone: user.phone,
-              toUserId: user.id,
-              subject: finalTemplate.subject || "Trial Expired Notice",
-              message: msgBody,
-            }).catch(err => console.error("Error dispatching final trial deactivation notice:", err.message));
-          }
+          console.log(`[AUTOMATION - DEACTIVATED] Dispatched to: ${user.email}`);
+          await sendTemplatedNotification({
+            eventKey: 'TRIAL_EXPIRED_FINAL',
+            tenantId: user.id,
+            receiverId: user.id,
+            receiverRole: 'Admin',
+            receiverEmail: user.email,
+            receiverPhone: user.phone,
+            variables: {
+              Name: user.fullName || "User"
+            },
+            referenceType: 'SUBSCRIPTION',
+            referenceId: user.id.toString(),
+            actionUrl: '/login'
+          });
         }
       }
 

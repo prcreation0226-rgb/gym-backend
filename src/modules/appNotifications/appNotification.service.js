@@ -22,23 +22,64 @@ export const createAppNotification = async ({
     throw new Error("Missing required fields for app notification");
   }
 
-  const sql = `
-    INSERT INTO app_notification (
-      tenantId, senderId, receiverId, receiverRole, type, title, message,
-      referenceType, referenceId, actionUrl, metadata, priority
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `;
-
   const metaStr = metadata ? JSON.stringify(metadata) : null;
+  const connection = await pool.getConnection();
 
   try {
-    const [result] = await pool.query(sql, [
+    await connection.beginTransaction();
+
+    // 1. Tenant Validation
+    const [[user]] = await connection.query("SELECT id, roleId, adminId FROM user WHERE id = ?", [receiverId]);
+    if (!user) {
+      throw new Error("Receiver does not exist");
+    }
+    
+    const expectedTenantId = user.roleId === 1 ? user.id : (user.adminId || user.id);
+    if (tenantId !== expectedTenantId && user.roleId !== 1) { 
+      // Note: If user is SuperAdmin (role=1) receiving from System, tenantId might be System
+      // We log but do not strictly block if tenantId mismatch occurs for SuperAdmin.
+      if (user.roleId !== 1) {
+        throw new Error(`Tenant mismatch. Expected ${expectedTenantId}, got ${tenantId}`);
+      }
+    }
+
+    // 2. Duplicate Check
+    const [existing] = await connection.query(`
+      SELECT id FROM app_notification 
+      WHERE type = ? AND receiverId = ? AND referenceType <=> ? AND referenceId <=> ? 
+      AND createdAt > NOW() - INTERVAL 5 MINUTE
+      LIMIT 1
+    `, [type, receiverId, referenceType, referenceId]);
+    
+    if (existing.length > 0) {
+      await connection.rollback();
+      connection.release();
+      return null; // Silently skip duplicate
+    }
+
+    // 3. Insert Notification
+    const sql = `
+      INSERT INTO app_notification (
+        tenantId, senderId, receiverId, receiverRole, type, title, message,
+        referenceType, referenceId, actionUrl, metadata, priority
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const [result] = await connection.query(sql, [
       tenantId, senderId, receiverId, receiverRole, type, title, message,
       referenceType, referenceId, actionUrl, metaStr, priority
     ]);
+    const notificationId = result.insertId;
+
+    // 4. Delivery Log (CREATED)
+    await connection.query(
+      `INSERT INTO notification_delivery_log (notificationId, tenantId, receiverId, status) VALUES (?, ?, ?, 'CREATED')`,
+      [notificationId, tenantId, receiverId]
+    );
+
+    await connection.commit();
 
     const newNotification = {
-      id: result.insertId,
+      id: notificationId,
       tenantId,
       senderId,
       receiverId,
@@ -56,14 +97,23 @@ export const createAppNotification = async ({
       createdAt: new Date().toISOString()
     };
 
-    // Emit real-time notification
-    // We emit to the receiverId string to match frontend join room logic
-    emitToUser(receiverId.toString(), "new_notification", newNotification);
+    // 5. Emit Real-time Notification
+    try {
+      emitToUser(receiverId.toString(), "new_notification", newNotification);
+      await pool.query("UPDATE notification_delivery_log SET status = 'SOCKET_SENT' WHERE notificationId = ?", [notificationId]);
+    } catch (sockErr) {
+      console.warn("Socket emit failed:", sockErr);
+      await pool.query("UPDATE notification_delivery_log SET status = 'FAILED', errorReason = ? WHERE notificationId = ?", [sockErr.message, notificationId]);
+    }
 
+    connection.release();
     return newNotification;
+
   } catch (error) {
+    await connection.rollback();
+    connection.release();
     console.error("Failed to create app notification:", error);
-    throw new Error("Could not create notification");
+    throw error;
   }
 };
 
