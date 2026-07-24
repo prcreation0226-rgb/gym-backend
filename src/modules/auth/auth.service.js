@@ -89,7 +89,7 @@ export const registerUser = async (data,payload) => {
       trialStatus = 'Active';
     }
 
-    const [templates] = await pool.query("SELECT * FROM message_templates WHERE templateType = 'WELCOME_TRIAL'");
+    const [templates] = await pool.query("SELECT * FROM message_templates WHERE eventKey = 'WELCOME_TRIAL'");
     welcomeTemplate = templates.length > 0 ? templates[0] : null;
   }
 
@@ -133,7 +133,7 @@ export const registerUser = async (data,payload) => {
 
   // ✅ Send real Welcome Email + WhatsApp when Admin registers (Trial or otherwise)
   if (trialStatus === 'Active' && welcomeTemplate) {
-    let msgBody = welcomeTemplate.messageBody
+    let msgBody = (welcomeTemplate.message || "")
       .replace('{Name}', fullName)
       .replace('{Days}', Math.round((trialEndDate - trialStartDate) / (1000 * 60 * 60 * 24)));
 
@@ -650,11 +650,11 @@ if (data?.subscriptionPlan) {
   updatedFields.push('status');
 
   // We should also send "SUBSCRIPTION_ACTIVATED" mock message here
-  const [[template]] = await pool.query("SELECT * FROM message_templates WHERE templateType = 'SUBSCRIPTION_ACTIVATED'");
+  const [[template]] = await pool.query("SELECT * FROM message_templates WHERE eventKey = 'SUBSCRIPTION_ACTIVATED'");
   if (template) {
     const [[user]] = await pool.query("SELECT fullName, email, phone FROM user WHERE id = ?", [id]);
     if (user) {
-      let msgBody = template.messageBody.replace('{Name}', user.fullName);
+      let msgBody = (template.message || "").replace('{Name}', user.fullName);
       // ✅ Send real Subscription Activated email + WhatsApp
       dispatchNotification({
         category: "saas_renewal_channel",

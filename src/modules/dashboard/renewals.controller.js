@@ -82,10 +82,10 @@ export const sendBulkExpiryReminders = async (req, res, next) => {
     let messageBody = "Your subscription is about to expire or has recently expired. Please renew your plan to ensure uninterrupted access.";
     
     try {
-      const [templates] = await pool.query("SELECT * FROM message_templates WHERE templateType = 'SUBSCRIPTION_EXPIRING' LIMIT 1");
+      const [templates] = await pool.query("SELECT * FROM message_templates WHERE eventKey = 'SUBSCRIPTION_EXPIRING' LIMIT 1");
       if (templates.length > 0) {
         subject = templates[0].subject;
-        messageBody = templates[0].messageBody;
+        messageBody = templates[0].message;
       }
     } catch (e) {
       console.warn("Failed to fetch template, using default.", e);
