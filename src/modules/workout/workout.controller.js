@@ -9,7 +9,8 @@ export const createWorkoutPlan = async (req, res, next) => {
     const workout = await createWorkoutPlanService(req.body);
     res.json({ success: true, workout, data: workout });
   } catch (err) {
-    next(err);
+    console.error("Workout Creation Error:", err);
+    res.status(500).json({ success: false, message: err.message || "Internal server error" });
   }
 };
 

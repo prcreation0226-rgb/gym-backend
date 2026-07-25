@@ -14,12 +14,13 @@ export const createWorkoutPlanService = async ({ title, notes, branchId, created
 
   // Insert exercises
   if (exercises && exercises.length) {
-    const exerciseValues = exercises.map(e => [workoutPlanId, e.name, e.reps || null, e.sets || null, e.duration || null]);
+    const exerciseValues = exercises.map(e => [workoutPlanId, e.name, e.reps || null, e.sets || null, e.duration || null, e.notes || null]);
     await pool.query(
-      "INSERT INTO workoutexercise (workoutPlanId, name, reps, sets, duration) VALUES ?",
+      "INSERT INTO workoutexercise (workoutPlanId, name, reps, sets, duration, notes) VALUES ?",
       [exerciseValues]
     );
   }
+
 
   // Return plan with exercises
   const [createdPlan] = await pool.query(

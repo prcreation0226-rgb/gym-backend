@@ -43,6 +43,19 @@ async function runStartupMigrations() {
     // Column already exists — safe to ignore
   }
 
+  // Alter workout tables
+  try {
+    await pool.query("ALTER TABLE workoutplan MODIFY branchId INT NULL");
+  } catch (e) {}
+  
+  try {
+    await pool.query("ALTER TABLE workoutexercise ADD COLUMN duration VARCHAR(100) NULL");
+  } catch (e) {}
+
+  try {
+    await pool.query("ALTER TABLE workoutexercise ADD COLUMN notes TEXT NULL");
+  } catch (e) {}
+
   // Alter plan table for discountPercent
   try {
     await pool.query("ALTER TABLE plan ADD COLUMN discountPercent DECIMAL(5,2) DEFAULT 0");
