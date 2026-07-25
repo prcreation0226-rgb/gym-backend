@@ -82,8 +82,8 @@ export const getMemberHealthLogsService = async (memberIdParam) => {
   let realMemberId = memberId;
   try {
     const [mRows] = await pool.query(
-      `SELECT id FROM member WHERE id = ? OR userId = ? LIMIT 1`,
-      [memberId, memberId]
+      `SELECT id FROM member WHERE id = ? LIMIT 1`,
+      [memberId]
     );
     if (mRows.length) {
       realMemberId = mRows[0].id;
@@ -98,9 +98,9 @@ export const getMemberHealthLogsService = async (memberIdParam) => {
             m.fullName, m.phone
      FROM member_health_log h
      JOIN member m ON h.memberId = m.id
-     WHERE h.memberId = ? OR h.memberId = ? OR m.userId = ? OR m.id = ?
+     WHERE h.memberId = ?
      ORDER BY h.recordedAt DESC`,
-    [realMemberId, memberId, memberId, memberId]
+    [realMemberId]
   );
 
   // 3. Fetch from member_assessments
@@ -110,9 +110,9 @@ export const getMemberHealthLogsService = async (memberIdParam) => {
             m.fullName, m.phone
      FROM member_assessments ma
      JOIN member m ON ma.memberId = m.id
-     WHERE ma.memberId = ? OR ma.memberId = ? OR m.userId = ? OR m.id = ?
+     WHERE ma.memberId = ?
      ORDER BY ma.id DESC`,
-    [realMemberId, memberId, memberId, memberId]
+    [realMemberId]
   );
 
   const formatBmiStatus = (bmiVal) => {

@@ -34,7 +34,7 @@ export const createTaskService = async (data) => {
     // Notification Logic
     if (assignedTo) {
       // Find userId for assigned staff
-      const [staffRows] = await pool.query(`SELECT userId FROM staff WHERE id = ? OR userId = ?`, [assignedTo, assignedTo]);
+      const [staffRows] = await pool.query(`SELECT userId FROM staff WHERE id = ?`, [assignedTo]);
       if (staffRows.length > 0) {
         const staffUserId = staffRows[0].userId;
         const msg = `A new task has been assigned to you by Admin.
@@ -216,7 +216,7 @@ export const updateTaskService = async (id, data) => {
 
   // Notification Logic
   if (updatedData.assignedTo) {
-    const [staffRows] = await pool.query(`SELECT userId FROM staff WHERE id = ? OR userId = ?`, [updatedData.assignedTo, updatedData.assignedTo]);
+    const [staffRows] = await pool.query(`SELECT userId FROM staff WHERE id = ?`, [updatedData.assignedTo]);
     if (staffRows.length > 0) {
       const staffUserId = staffRows[0].userId;
       const msg = `Task Updated: ${updatedData.taskTitle}
@@ -250,7 +250,7 @@ export const updateTaskStatusService = async (id, status) => {
     // Notify Admin
     let staffName = "Staff";
     if (existing.assignedTo) {
-      const [sRows] = await pool.query(`SELECT user.fullName FROM staff JOIN user ON staff.userId = user.id WHERE staff.id = ? OR staff.userId = ?`, [existing.assignedTo, existing.assignedTo]);
+      const [sRows] = await pool.query(`SELECT user.fullName FROM staff JOIN user ON staff.userId = user.id WHERE staff.id = ?`, [existing.assignedTo]);
       if (sRows.length > 0) staffName = sRows[0].fullName;
     }
     const msg = status === "Completed" ? `${staffName} completed task: ${existing.taskTitle}` : `${staffName} started task: ${existing.taskTitle}`;
@@ -262,7 +262,7 @@ export const updateTaskStatusService = async (id, status) => {
     });
   } else if (["Approved", "Rejected"].includes(status) && existing.assignedTo) {
     // Notify Staff
-    const [staffRows] = await pool.query(`SELECT userId FROM staff WHERE id = ? OR userId = ?`, [existing.assignedTo, existing.assignedTo]);
+    const [staffRows] = await pool.query(`SELECT userId FROM staff WHERE id = ?`, [existing.assignedTo]);
     if (staffRows.length > 0) {
       const staffUserId = staffRows[0].userId;
       const msg = status === "Approved" ? `Your completed task has been approved: ${existing.taskTitle}` : `Your completed task has been rejected: ${existing.taskTitle}`;
@@ -284,7 +284,7 @@ export const deleteTaskService = async (id) => {
   if (existingRows.length > 0) {
     const existing = existingRows[0];
     if (existing.assignedTo) {
-      const [staffRows] = await pool.query(`SELECT userId FROM staff WHERE id = ? OR userId = ?`, [existing.assignedTo, existing.assignedTo]);
+      const [staffRows] = await pool.query(`SELECT userId FROM staff WHERE id = ?`, [existing.assignedTo]);
       if (staffRows.length > 0) {
         const staffUserId = staffRows[0].userId;
         const msg = `Assigned Task Cancelled: ${existing.taskTitle}`;

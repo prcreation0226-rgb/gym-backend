@@ -203,8 +203,8 @@ export const bookClassService = async (memberId, scheduleId) => {
   try {
     /* 1️⃣ MAP userId/memberId → member.id */
     const [memberRows] = await connection.query(
-      "SELECT id, userId, fullName, email, phone, branchId, adminId FROM member WHERE userId = ? OR id = ?",
-      [memberId, memberId]
+      "SELECT id, userId, fullName, email, phone, branchId, adminId FROM member WHERE id = ?",
+      [memberId]
     );
 
     if (memberRows.length === 0) {
@@ -431,12 +431,11 @@ export const getScheduledClassesWithBookingStatusService = async (
 
   if (memberId) {
     const [memberRows] = await pool.query(
-      `
       SELECT id
       FROM member
-      WHERE id = ? OR userId = ?
+      WHERE id = ?
       `,
-      [memberId, memberId]
+      [memberId]
     );
 
     if (memberRows.length > 0) {

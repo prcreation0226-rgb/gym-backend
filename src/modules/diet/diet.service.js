@@ -155,8 +155,8 @@ export const getMemberDietPlanService = async (memberIdParam) => {
 
   try {
     const [mRows] = await pool.query(
-      `SELECT id, branchId, goal FROM member WHERE id = ? OR userId = ? LIMIT 1`,
-      [memberId, memberId]
+      `SELECT id, branchId, goal FROM member WHERE id = ? LIMIT 1`,
+      [memberId]
     );
     if (mRows.length) {
       realMemberId = mRows[0].id;
@@ -173,9 +173,9 @@ export const getMemberDietPlanService = async (memberIdParam) => {
      FROM dietplanassignment a
      JOIN dietplan d ON a.dietPlanId = d.id
      LEFT JOIN dietmeal m ON d.id = m.dietPlanId
-     WHERE a.memberId = ? OR a.memberId = ?
+     WHERE a.memberId = ?
      ORDER BY a.id DESC`,
-    [realMemberId, memberId]
+    [realMemberId]
   );
 
   const plansMap = {};
@@ -202,45 +202,6 @@ export const getMemberDietPlanService = async (memberIdParam) => {
     });
     return Object.values(plansMap);
   }
-
-  // 3. Fallback: If no direct assignment exists, fetch available diet plans for branch or general system diet plans
-  let fallbackSql = `
-    SELECT d.id AS dietPlanId, d.title, d.notes, d.dietType, d.createdAt AS assignedAt,
-           m.id AS mealId, m.time AS mealTime, m.food AS mealFood
-    FROM dietplan d
-    LEFT JOIN dietmeal m ON d.id = m.dietPlanId
-  `;
-  const fallbackParams = [];
-
-  if (branchId && parseInt(branchId, 10) > 0) {
-    fallbackSql += ` WHERE (d.branchId = ? OR d.branchId = 0 OR d.branchId IS NULL)`;
-    fallbackParams.push(parseInt(branchId, 10));
-  }
-
-  fallbackSql += ` ORDER BY d.id DESC`;
-
-  const [fallbackRows] = await pool.query(fallbackSql, fallbackParams);
-
-  fallbackRows.forEach(r => {
-    if (!plansMap[r.dietPlanId]) {
-      plansMap[r.dietPlanId] = { 
-        id: r.dietPlanId, 
-        assignmentId: 0,
-        assignedAt: r.assignedAt,
-        title: r.title, 
-        notes: r.notes, 
-        dietType: r.dietType || 'Any',
-        meals: [] 
-      };
-    }
-    if (r.mealId) {
-      plansMap[r.dietPlanId].meals.push({
-        id: r.mealId,
-        time: r.mealTime,
-        food: r.mealFood
-      });
-    }
-  });
 
   return Object.values(plansMap);
 };

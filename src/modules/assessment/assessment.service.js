@@ -180,8 +180,8 @@ export const getLatestAssessment = async (memberIdParam) => {
 
   try {
     const [mRows] = await pool.query(
-      `SELECT id, fullName, gender, dateOfBirth, joinDate, branchId FROM member WHERE id = ? OR userId = ? LIMIT 1`,
-      [memberId, memberId]
+      `SELECT id, fullName, gender, dateOfBirth, joinDate, branchId FROM member WHERE id = ? LIMIT 1`,
+      [memberId]
     );
     if (mRows.length) {
       realMemberId = mRows[0].id;
@@ -193,8 +193,8 @@ export const getLatestAssessment = async (memberIdParam) => {
 
   // 2. Query member_assessments
   const [assessments] = await pool.query(
-    `SELECT * FROM member_assessments WHERE memberId = ? OR memberId = ? ORDER BY assessment_date DESC LIMIT 1`,
-    [realMemberId, memberId]
+    `SELECT * FROM member_assessments WHERE memberId = ? ORDER BY assessment_date DESC LIMIT 1`,
+    [realMemberId]
   );
 
   if (assessments.length > 0) {
@@ -314,8 +314,8 @@ export const getAssessmentHistory = async (memberIdParam) => {
 
   try {
     const [mRows] = await pool.query(
-      `SELECT id, fullName, joinDate, branchId FROM member WHERE id = ? OR userId = ? LIMIT 1`,
-      [memberId, memberId]
+      `SELECT id, fullName, joinDate, branchId FROM member WHERE id = ? LIMIT 1`,
+      [memberId]
     );
     if (mRows.length) {
       realMemberId = mRows[0].id;
@@ -328,17 +328,17 @@ export const getAssessmentHistory = async (memberIdParam) => {
   // 2. Fetch from member_assessments
   const [assessmentRecords] = await pool.query(
     `SELECT ma.* FROM member_assessments ma
-     WHERE ma.memberId = ? OR ma.memberId = ?
+     WHERE ma.memberId = ?
      ORDER BY ma.assessment_date ASC`,
-    [realMemberId, memberId]
+    [realMemberId]
   );
 
   // 3. Fetch from member_health_log
   const [healthRecords] = await pool.query(
     `SELECT h.* FROM member_health_log h
-     WHERE h.memberId = ? OR h.memberId = ?
+     WHERE h.memberId = ?
      ORDER BY h.recordedAt ASC`,
-    [realMemberId, memberId]
+    [realMemberId]
   );
 
   const historyMap = {};

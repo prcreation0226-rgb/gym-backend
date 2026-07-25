@@ -248,7 +248,7 @@ export const createMemberService = async (data) => {
   // 4️⃣ Strict Notification Requirement: "Welcome to the Gym"
   try {
     await createAppNotification({
-      tenantId: adminId || userId,
+      tenantId: Number(adminId || userId),
       receiverId: userId,
       receiverRole: 'Member',
       type: 'Welcome',
@@ -273,7 +273,7 @@ export const createMemberService = async (data) => {
     
     try {
       await createAppNotification({
-        tenantId: adminId || userId,
+        tenantId: Number(adminId || userId),
         receiverId: userId,
         receiverRole: 'Member',
         type: 'Membership',

@@ -71,8 +71,8 @@ export const getMemberWorkoutPlanService = async (memberIdParam) => {
 
   try {
     const [mRows] = await pool.query(
-      `SELECT id, branchId FROM member WHERE id = ? OR userId = ? LIMIT 1`,
-      [memberId, memberId]
+      `SELECT id, branchId FROM member WHERE id = ? LIMIT 1`,
+      [memberId]
     );
     if (mRows.length) {
       realMemberId = mRows[0].id;
@@ -89,9 +89,9 @@ export const getMemberWorkoutPlanService = async (memberIdParam) => {
      FROM workoutplanassignment a
      JOIN workoutplan w ON a.workoutPlanId = w.id
      LEFT JOIN workoutexercise e ON w.id = e.workoutPlanId
-     WHERE a.memberId = ? OR a.memberId = ?
+     WHERE a.memberId = ?
      ORDER BY a.id DESC`,
-    [realMemberId, memberId]
+    [realMemberId]
   );
 
   const plansMap = {};

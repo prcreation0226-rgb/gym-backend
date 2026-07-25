@@ -108,8 +108,8 @@ export const getShiftByIdService = async (id) => {
 export const getShiftByStaffIdService = async (staffId) => {
   // Resolve both staff.id and staff.userId for reliable matching
   const [staffRows] = await pool.query(
-    "SELECT id, userId FROM staff WHERE id = ? OR userId = ?",
-    [staffId, staffId]
+    "SELECT id, userId FROM staff WHERE id = ?",
+    [staffId]
   );
 
   const realStaffId = staffRows.length ? staffRows[0].id : staffId;
