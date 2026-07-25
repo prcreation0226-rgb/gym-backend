@@ -64,7 +64,7 @@ export const getAvailableMonths = async (branchId) => {
 /**
  * Internal helper to calculate monthly rankings for a specific monthKey (YYYY-MM)
  */
-const getMonthlyRankings = async (branchId, targetGoal = 'fat_loss', monthKey) => {
+const getMonthlyRankings = async (branchId, targetGoal = 'fat_loss', monthKey, user = null) => {
   const normalizedGoal = targetGoal.toLowerCase().trim();
 
   // Explicitly exclude Body Builder members from processing
@@ -79,10 +79,19 @@ const getMonthlyRankings = async (branchId, targetGoal = 'fat_loss', monthKey) =
 
   // Branch & Admin lookup
   let adminId = null;
+
+  if (user) {
+    if (user.roleId === 2 || user.role === 'ADMIN' || user.role === 'Admin') {
+      adminId = user.id;
+    } else if (user.adminId) {
+      adminId = user.adminId;
+    }
+  }
+
   if (branchId && branchId !== 'all' && branchId !== '0' && parseInt(branchId) > 0) {
     try {
       const [bRows] = await pool.query(`SELECT adminId FROM branch WHERE id = ?`, [parseInt(branchId)]);
-      if (bRows.length) {
+      if (bRows.length && !adminId) {
         adminId = bRows[0].adminId;
       }
     } catch (e) {
@@ -118,14 +127,14 @@ const getMonthlyRankings = async (branchId, targetGoal = 'fat_loss', monthKey) =
 
   const params = [endOfMonthStr, endOfMonthStr];
 
+  if (adminId) {
+    sql += ` AND m.adminId = ?`;
+    params.push(adminId);
+  }
+
   if (branchId && branchId !== 'all' && branchId !== '0' && parseInt(branchId) > 0) {
-    if (adminId) {
-      sql += ` AND (m.branchId = ? OR m.branchId IS NULL OR m.adminId = ?)`;
-      params.push(parseInt(branchId), adminId);
-    } else {
-      sql += ` AND (m.branchId = ? OR m.branchId IS NULL)`;
-      params.push(parseInt(branchId));
-    }
+    sql += ` AND (m.branchId = ? OR m.branchId IS NULL)`;
+    params.push(parseInt(branchId));
   }
 
   sql += ` ORDER BY ma.memberId ASC, ma.id ASC`;
@@ -292,7 +301,7 @@ const getMonthlyRankings = async (branchId, targetGoal = 'fat_loss', monthKey) =
 /**
  * Main service entry point for goal & month-wise leaderboard with rank changes
  */
-export const getLeaderboardByGoal = async (branchId, fitnessGoal = 'fat_loss', monthKey = null, limit = 100) => {
+export const getLeaderboardByGoal = async (branchId, fitnessGoal = 'fat_loss', monthKey = null, limit = 100, user = null) => {
   const normalizedGoal = (fitnessGoal || 'fat_loss').toLowerCase();
   const availableMonths = await getAvailableMonths(branchId);
 
@@ -302,12 +311,12 @@ export const getLeaderboardByGoal = async (branchId, fitnessGoal = 'fat_loss', m
   }
 
   const selectedMonthLabel = formatMonthLabel(selectedMonthKey);
-  const currentRankings = await getMonthlyRankings(branchId, normalizedGoal, selectedMonthKey);
+  const currentRankings = await getMonthlyRankings(branchId, normalizedGoal, selectedMonthKey, user);
 
   const prevMonthKey = getPreviousMonthKey(selectedMonthKey);
   let prevRankingsMap = new Map();
   if (prevMonthKey) {
-    const prevRankings = await getMonthlyRankings(branchId, normalizedGoal, prevMonthKey);
+    const prevRankings = await getMonthlyRankings(branchId, normalizedGoal, prevMonthKey, user);
     for (const p of prevRankings) {
       prevRankingsMap.set(p.memberId, p.rank);
     }

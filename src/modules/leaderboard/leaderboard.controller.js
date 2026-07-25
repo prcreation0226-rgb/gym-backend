@@ -13,7 +13,7 @@ export const getLeaderboard = async (req, res) => {
       });
     }
 
-    const result = await getLeaderboardByGoal(branchId, selectedGoal, month, 100);
+    const result = await getLeaderboardByGoal(branchId, selectedGoal, month, 100, req.user);
 
     return res.status(200).json({
       status: true,
