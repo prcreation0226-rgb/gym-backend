@@ -51,3 +51,49 @@ export const sendAppNotification = async (to, message, options = {}) => {
     console.error("Failed to send app notification:", err);
   }
 };
+
+export const notifyAdminAndStaff = async (adminId, message, options = {}) => {
+  try {
+    const {
+      title = "Notification",
+      sender_id = null,
+      sender_role = null,
+      reference_type = null,
+      reference_id = null
+    } = options;
+
+    if (!adminId) return;
+
+    // Lookup Admin and all their staff (excluding members, roleId=4)
+    // roleId=1 is Super Admin, usually excluded from tenant staff unless they are the admin.
+    const [users] = await pool.query(
+      `SELECT id, roleId, adminId, fullName FROM user 
+       WHERE (id = ? OR adminId = ?) 
+       AND roleId != 4 AND roleId != 1`,
+      [adminId, adminId]
+    );
+
+    for (const u of users) {
+      let roleName = 'Staff';
+      if (u.roleId === 2) roleName = 'Admin';
+      else if (u.roleId === 3 || u.roleId === 5 || u.roleId === 6) roleName = 'Trainer';
+      else if (u.roleId === 7) roleName = 'Receptionist';
+      else if (u.roleId === 8) roleName = 'Manager';
+
+      await createAppNotification({
+        tenantId: adminId,
+        senderId: sender_id,
+        receiverId: u.id,
+        receiverRole: roleName,
+        type: title,
+        title: title,
+        message: message,
+        referenceType: reference_type,
+        referenceId: reference_id ? reference_id.toString() : null
+      });
+    }
+
+  } catch (err) {
+    console.error("Failed to notify admin and staff:", err);
+  }
+};

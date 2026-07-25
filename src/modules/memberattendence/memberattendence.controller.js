@@ -1,6 +1,7 @@
 import { pool } from "../../config/db.js";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
 import { emitToUser } from "../../config/socket.js";
+import { notifyAdminAndStaff } from "../../utils/notificationHelper.js";
 
 /* -----------------------------------------------------
    1️⃣  MEMBER/ADMIN CHECK-IN  (Manual + QR + Manual Times)
@@ -259,7 +260,16 @@ export const memberCheckIn = async (req, res, next) => {
         memberId,
         branchId: userBranchId
       });
+
+      // Send app notification to admin and their staff
+      const attName = isMember ? memberRecords[0].fullName : (typeof userRecords !== 'undefined' ? userRecords[0].fullName : "User");
+      const checkInTime = finalCheckIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      await notifyAdminAndStaff(adminToNotify, `${attName} has checked in at ${checkInTime}.`, {
+        title: "New Check-In",
+        reference_type: "ATTENDANCE"
+      });
     }
+
 
     res.json({
       success: true,

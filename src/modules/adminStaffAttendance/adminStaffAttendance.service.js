@@ -95,6 +95,8 @@
 // };
 
 import { pool } from "../../config/db.js";
+import { notifyAdminAndStaff } from "../../utils/notificationHelper.js";
+
 
 /**************************************
  * CREATE STAFF ATTENDANCE
@@ -294,6 +296,15 @@ export const createStaffAttendanceService = async (data) => {
     `,
     [result.insertId]
   );
+
+  /* ---------------- NOTIFY ---------------- */
+  if (adminId && attendance) {
+    const checkInTimeStr = checkIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    await notifyAdminAndStaff(adminId, `Staff ${attendance.staffName} checked in manually at ${checkInTimeStr}.`, {
+      title: "Staff Check-In",
+      reference_type: "ATTENDANCE"
+    });
+  }
 
   /* ---------------- FINAL RESPONSE ---------------- */
 
