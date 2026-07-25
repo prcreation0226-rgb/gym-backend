@@ -20,10 +20,10 @@ export const createStaffService = async (data) => {
   } = data;
 
   /* ----------------------------------------------------
-     1️⃣ CHECK DUPLICATE EMAIL
+     1️⃣ CHECK DUPLICATE EMAIL (Scoped to Admin)
   ---------------------------------------------------- */
-  const [exists] = await pool.query("SELECT id FROM user WHERE email = ?", [
-    email,
+  const [exists] = await pool.query("SELECT id FROM user WHERE email = ? AND adminId = ?", [
+    email, adminId
   ]);
 
   if (exists.length > 0) {
@@ -31,13 +31,13 @@ export const createStaffService = async (data) => {
   }
 
   /* ----------------------------------------------------
-     1B️⃣ CHECK DUPLICATE PHONE (GLOBAL — user table is single source)
+     1B️⃣ CHECK DUPLICATE PHONE (Scoped to Admin)
   ---------------------------------------------------- */
   if (phone) {
     const cleanPhone = phone.trim();
     const [phoneExists] = await pool.query(
-      "SELECT id FROM user WHERE phone = ?",
-      [cleanPhone]
+      "SELECT id FROM user WHERE phone = ? AND adminId = ?",
+      [cleanPhone, adminId]
     );
     if (phoneExists.length > 0) {
       throw { status: 400, message: "Phone number already registered" };
@@ -258,8 +258,10 @@ export const updateStaffService = async (id, data) => {
       s.id AS staffId,
       s.userId,
       s.branchId,
-      s.profilePhoto
+      s.profilePhoto,
+      u.adminId
     FROM staff s
+    JOIN user u ON u.id = s.userId
     WHERE s.id = ? OR s.userId = ?
     LIMIT 1
     `,
@@ -275,12 +277,13 @@ export const updateStaffService = async (id, data) => {
   const existingProfilePhoto = staff.profilePhoto;
 
   /* ----------------------------------------------------
-     2️⃣ EMAIL DUPLICATE CHECK (IF EMAIL UPDATED)
+     2️⃣ EMAIL DUPLICATE CHECK (IF EMAIL UPDATED, Scoped to Admin)
   ---------------------------------------------------- */
   if (data.email) {
+    const targetAdminId = data.adminId || staff.adminId;
     const [[emailExists]] = await pool.query(
-      `SELECT id FROM user WHERE email = ? AND id != ?`,
-      [data.email, userId]
+      `SELECT id FROM user WHERE email = ? AND adminId = ? AND id != ?`,
+      [data.email, targetAdminId, userId]
     );
 
     if (emailExists) {
