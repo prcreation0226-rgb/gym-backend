@@ -67,17 +67,13 @@ export const assignPlansToMember = async (data) => {
 
     // APP NOTIFICATION
     if (member.userId) {
-      await sendTemplatedNotification({
-        eventKey: 'MEMBER_PLAN_ASSIGNED',
+      await createAppNotification({
         tenantId: member.adminId || member.userId,
         receiverId: member.userId,
         receiverRole: 'Member',
-        receiverEmail: member.email,
-        receiverPhone: member.phone,
-        variables: {
-          Name: member.fullName || "Member",
-          PlanName: plan.name || "N/A"
-        },
+        type: 'General',
+        title: 'Membership Activated',
+        message: `Your membership plan '${plan.name || 'N/A'}' has been successfully assigned. Validity: ${plan.validityDays || 30} days.`,
         referenceType: 'PLAN_ASSIGNMENT',
         referenceId: result.insertId.toString(),
         actionUrl: '/member-dashboard'

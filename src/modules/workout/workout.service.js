@@ -113,38 +113,5 @@ export const getMemberWorkoutPlanService = async (memberIdParam) => {
     return Object.values(plansMap);
   }
 
-  // 3. Fallback: If no direct assignment exists, fetch available workout plans for branch or general system workout plans
-  let fallbackSql = `
-    SELECT w.id AS workoutPlanId, w.title, w.notes,
-           e.id AS exerciseId, e.name AS exerciseName, e.reps, e.sets, e.duration
-    FROM workoutplan w
-    LEFT JOIN workoutexercise e ON w.id = e.workoutPlanId
-  `;
-  const fallbackParams = [];
-
-  if (branchId && parseInt(branchId, 10) > 0) {
-    fallbackSql += ` WHERE (w.branchId = ? OR w.branchId = 0 OR w.branchId IS NULL)`;
-    fallbackParams.push(parseInt(branchId, 10));
-  }
-
-  fallbackSql += ` ORDER BY w.id DESC`;
-
-  const [fallbackRows] = await pool.query(fallbackSql, fallbackParams);
-
-  fallbackRows.forEach(r => {
-    if (!plansMap[r.workoutPlanId]) {
-      plansMap[r.workoutPlanId] = { id: r.workoutPlanId, title: r.title, notes: r.notes, exercises: [] };
-    }
-    if (r.exerciseId) {
-      plansMap[r.workoutPlanId].exercises.push({
-        id: r.exerciseId,
-        name: r.exerciseName,
-        reps: r.reps,
-        sets: r.sets,
-        duration: r.duration
-      });
-    }
-  });
-
   return Object.values(plansMap);
 };
