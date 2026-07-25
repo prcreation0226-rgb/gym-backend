@@ -438,7 +438,7 @@ export const getOverviewService = async (branchId, startDate, endDate) => {
     
     // Recent Payments
     pool.query(`
-      SELECT p.id as invoiceNumber, m.fullName as memberName, p.amount, p.paymentDate as paidDate, p.paymentMethod, 'Success' as paymentStatus
+      SELECT p.id as invoiceNumber, m.fullName as memberName, p.amount, p.paymentDate as paidDate, 'Online' as paymentMethod, 'Success' as paymentStatus
       FROM payment p
       LEFT JOIN member m ON p.memberId = m.id
       WHERE 1=1 ${revenueFilter.query}
