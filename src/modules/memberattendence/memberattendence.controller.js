@@ -286,22 +286,26 @@ export const getAttendanceByMemberId = async (req, res, next) => {
     const [rows] = await pool.query(
       `
       SELECT 
-        id,
-        memberId,
-        staffId,
-        branchId,
-        checkIn,
-        checkOut,
-        createdAt,
-        notes,
-        status,
-        mode
-      FROM memberattendance
-      WHERE memberId = ? 
-         OR staffId = ? 
-         OR memberId = (SELECT id FROM member WHERE userId = ? LIMIT 1)
-         OR staffId = (SELECT id FROM staff WHERE userId = ? LIMIT 1)
-      ORDER BY id DESC
+        a.id,
+        a.memberId,
+        a.staffId,
+        a.branchId,
+        a.checkIn,
+        a.checkOut,
+        a.createdAt,
+        a.notes,
+        a.status,
+        a.mode,
+        COALESCE(m.fullName, u.fullName) AS fullName
+      FROM memberattendance a
+      LEFT JOIN member m ON a.memberId = m.id
+      LEFT JOIN staff s ON a.staffId = s.id
+      LEFT JOIN user u ON s.userId = u.id
+      WHERE a.memberId = ? 
+         OR a.staffId = ? 
+         OR a.memberId = (SELECT id FROM member WHERE userId = ? LIMIT 1)
+         OR a.staffId = (SELECT id FROM staff WHERE userId = ? LIMIT 1)
+      ORDER BY a.id DESC
       `,
       [memberId, memberId, memberId, memberId]
     );
