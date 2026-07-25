@@ -121,46 +121,36 @@ export const createAppNotification = async ({
  * Fetch paginated user notifications, safely scoped by tenant and receiver ID/Role.
  */
 export const getUserNotifications = async (tenantId, receiverId, receiverRole, limit = 20, offset = 0) => {
-  const isSuperAdmin = receiverRole === 'Superadmin' || receiverRole === 'Super Admin';
-  const roleCondition = isSuperAdmin ? "(receiverRole = 'Superadmin' OR receiverRole = 'Super Admin')" : "receiverRole = ?";
-  
+  // NOTE: We do NOT filter by receiverRole here because the stored role at creation time
+  // may differ from the role derived from the JWT at fetch time (e.g. 'Trainer' vs 'Staff').
+  // receiverId is unique per user, so tenantId + receiverId is sufficient.
   const sql = `
     SELECT * FROM app_notification
-    WHERE tenantId = ? AND receiverId = ? AND ${roleCondition}
+    WHERE tenantId = ? AND receiverId = ?
     ORDER BY createdAt DESC
     LIMIT ? OFFSET ?
   `;
-  
-  const params = isSuperAdmin 
-    ? [tenantId, receiverId, parseInt(limit), parseInt(offset)]
-    : [tenantId, receiverId, receiverRole, parseInt(limit), parseInt(offset)];
-
-  const [rows] = await pool.query(sql, params);
+  const [rows] = await pool.query(sql, [tenantId, receiverId, parseInt(limit), parseInt(offset)]);
   return rows.map(r => ({
     ...r,
     metadata: r.metadata ? (typeof r.metadata === 'string' ? JSON.parse(r.metadata) : r.metadata) : null
   }));
 };
 
+
 /**
  * Get unread count for a user.
  */
 export const getUnreadCount = async (tenantId, receiverId, receiverRole) => {
-  const isSuperAdmin = receiverRole === 'Superadmin' || receiverRole === 'Super Admin';
-  const roleCondition = isSuperAdmin ? "(receiverRole = 'Superadmin' OR receiverRole = 'Super Admin')" : "receiverRole = ?";
-
+  // NOTE: Same as getUserNotifications — do not filter by receiverRole to avoid role mismatch.
   const sql = `
     SELECT COUNT(*) as count FROM app_notification
-    WHERE tenantId = ? AND receiverId = ? AND ${roleCondition} AND isRead = FALSE
+    WHERE tenantId = ? AND receiverId = ? AND isRead = FALSE
   `;
-  
-  const params = isSuperAdmin 
-    ? [tenantId, receiverId]
-    : [tenantId, receiverId, receiverRole];
-
-  const [rows] = await pool.query(sql, params);
+  const [rows] = await pool.query(sql, [tenantId, receiverId]);
   return rows[0].count;
 };
+
 
 /**
  * Mark a specific notification as read.
