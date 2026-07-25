@@ -1,7 +1,7 @@
 // src/modules/member/memberDashboard.service.js
 import { pool } from "../../config/db.js";
 
-export const getMemberDashboardService = async (memberId) => {
+export const getMemberDashboardService = async (memberId, adminId) => {
   /* 1️⃣ MEMBER */
   const [[member]] = await pool.query(
     `
@@ -65,9 +65,11 @@ export const getMemberDashboardService = async (memberId) => {
     `
     SELECT COUNT(*) AS total
     FROM classschedule
-    WHERE date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+    WHERE adminId = ?
+      AND date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
       AND status = 'Active'
-    `
+    `,
+    [adminId]
   );
 
   /* 4️⃣ NEXT SESSION */
@@ -75,11 +77,13 @@ export const getMemberDashboardService = async (memberId) => {
     `
     SELECT id, sessionName, date, time, duration
     FROM session
-    WHERE status = 'Upcoming'
+    WHERE adminId = ?
+      AND status = 'Upcoming'
       AND date >= NOW()
     ORDER BY date, time
     LIMIT 1
-    `
+    `,
+    [adminId]
   );
 
   return {

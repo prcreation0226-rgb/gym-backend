@@ -5,8 +5,8 @@ const getIdentity = (req) => {
   const isSuperAdmin = req.user.roleId === 1;
   const tenantId = isSuperAdmin ? req.user.id : (req.user.adminId || req.user.id);
   
-  // Use req.user.memberId if present, otherwise req.user.id
-  let receiverId = req.user.memberId ? req.user.memberId : req.user.id;
+  // Use req.user.id because notifications are tied to the 'user' table ID, not 'member' domain ID
+  let receiverId = req.user.id;
   
   let receiverRole = req.user.role || (req.user.roleId === 1 ? 'Super Admin' : (req.user.roleId === 2 ? 'Admin' : (req.user.roleId === 4 ? 'Member' : 'Staff')));
   

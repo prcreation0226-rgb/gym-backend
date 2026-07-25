@@ -4,6 +4,7 @@ import { getMemberDashboardService } from "./memberDashboard.service.js";
 export const getMemberDashboard = async (req, res, next) => {
   try {
     const memberId = parseInt(req.params.memberId);
+    const adminId = req.user.adminId; // Get adminId from authenticated user
 
     if (!memberId) {
       return res.status(400).json({
@@ -12,7 +13,7 @@ export const getMemberDashboard = async (req, res, next) => {
       });
     }
 
-    const data = await getMemberDashboardService(memberId);
+    const data = await getMemberDashboardService(memberId, adminId);
 
     return res.json({
       success: true,

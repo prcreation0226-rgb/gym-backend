@@ -1,6 +1,7 @@
 import { pool } from "../../config/db.js";
 import XLSX from "xlsx";
 import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
+import { createAppNotification } from "../appNotifications/appNotification.service.js";
 
 /**************************************
  * CREATE MEMBER
@@ -244,46 +245,47 @@ export const createMemberService = async (data) => {
 
   console.log(`✅ Total plans assigned: ${assignedPlans.length} out of ${plansToAssign.length} requested`);
 
-  // Send welcome note using global channels configured by Super Admin
-  await sendTemplatedNotification({
-    eventKey: 'MEMBER_CREATED',
-    tenantId: adminId || userId,
-    receiverId: userId,
-    receiverRole: 'Member',
-    receiverEmail: memberEmail,
-    receiverPhone: phone,
-    variables: {
-      Name: fullName || "Member",
-      Email: memberEmail,
-      Password: userPassword
-    },
-    referenceType: 'MEMBER',
-    referenceId: memberId.toString(),
-    actionUrl: '/member-dashboard'
-  });
-
-  // Send invoice receipt if paid during creation
-  if (amountPaid && Number(amountPaid) > 0) {
-    let planNames = "Gym Plan";
-    if (assignedPlans && assignedPlans.length > 0) {
-      planNames = assignedPlans.map(p => p.planName).join(", ");
-    }
-
-    await sendTemplatedNotification({
-      eventKey: 'PAYMENT_SUCCESS',
+  // 4️⃣ Strict Notification Requirement: "Welcome to the Gym"
+  try {
+    await createAppNotification({
       tenantId: adminId || userId,
       receiverId: userId,
       receiverRole: 'Member',
-      receiverEmail: memberEmail,
-      receiverPhone: phone,
-      variables: {
-        Name: fullName || "Member",
-        Amount: amountPaid
-      },
-      referenceType: 'PAYMENT',
+      type: 'Welcome',
+      title: 'Welcome to the Gym 🎉',
+      message: 'Welcome to our fitness family. Your account has been created successfully. We wish you a healthy and successful fitness journey.',
+      referenceType: 'MEMBER',
       referenceId: memberId.toString(),
-      actionUrl: '/member-dashboard/invoices'
+      actionUrl: '/member-dashboard'
     });
+  } catch (err) {
+    console.error("Failed to insert Welcome notification:", err.message);
+  }
+
+  // 5️⃣ Strict Notification Requirement: "Membership Activated"
+  if (assignedPlans && assignedPlans.length > 0) {
+    const p = assignedPlans[0];
+    const startDateFormatted = p.membershipFrom.toISOString().split('T')[0];
+    const expiryDateFormatted = p.membershipTo.toISOString().split('T')[0];
+    
+    // Attempt to calculate duration (in days)
+    const durationDays = Math.round((p.membershipTo - p.membershipFrom) / (1000 * 60 * 60 * 24));
+    
+    try {
+      await createAppNotification({
+        tenantId: adminId || userId,
+        receiverId: userId,
+        receiverRole: 'Member',
+        type: 'Membership',
+        title: 'Membership Activated',
+        message: `Your membership plan has been activated successfully.\n\nPlan Name: ${p.planName}\nPlan Duration: ${durationDays} days\nStart Date: ${startDateFormatted}\nExpiry Date: ${expiryDateFormatted}`,
+        referenceType: 'MEMBERSHIP',
+        referenceId: memberId.toString(),
+        actionUrl: '/member-dashboard/my-plan'
+      });
+    } catch (err) {
+      console.error("Failed to insert Membership Activated notification:", err.message);
+    }
   }
 
   return {
