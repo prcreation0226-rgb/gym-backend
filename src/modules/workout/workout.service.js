@@ -3,7 +3,7 @@ import { pool } from "../../config/db.js";
 // ----- CREATE WORKOUT PLAN -----
 export const createWorkoutPlanService = async ({ title, notes, branchId, createdBy, exercises }) => {
   if (!title) throw { status: 400, message: "Workout plan title is required" };
-  if (!branchId) throw { status: 400, message: "Branch ID is required" };
+  // branchId is optional — admins without a branch can still create workout plans
 
   // Insert workout plan
   const [planResult] = await pool.query(
