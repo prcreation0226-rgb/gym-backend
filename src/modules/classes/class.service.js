@@ -431,6 +431,7 @@ export const getScheduledClassesWithBookingStatusService = async (
 
   if (memberId) {
     const [memberRows] = await pool.query(
+      `
       SELECT id
       FROM member
       WHERE id = ?
