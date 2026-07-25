@@ -1,5 +1,6 @@
 import { pool } from "../../config/db.js";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
+import { sendAppNotification } from "../../utils/notificationHelper.js";
 
 // ----- CREATE DIET PLAN -----
 export const createDietPlanService = async ({ title, notes, branchId, createdBy, meals, dietType }) => {
@@ -136,6 +137,12 @@ export const assignDietPlanService = async (memberId, dietPlanId) => {
       }).catch((err) =>
         console.error("Failed to dispatch diet plan assignment notification:", err.message)
       );
+
+      sendAppNotification(member.userId, `A new diet plan "${planTitle}" has been assigned to you.`, {
+        title: "Diet Plan Assigned",
+        reference_type: "DIET_PLAN",
+        reference_id: dietPlanId
+      }).catch(err => console.error("Failed to send app notification for diet assignment:", err));
     }
   } catch (err) {
     console.error("Error fetching notification details for diet assignment:", err.message);

@@ -3,6 +3,7 @@ import { AssessmentEngine } from './assessment.engine.js';
 import { validateAssessmentInputs } from './assessment.validator.js';
 import { LeaderboardEngine } from '../leaderboard/leaderboard.engine.js';
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
+import { sendAppNotification } from "../../utils/notificationHelper.js";
 import { pool } from "../../config/db.js";
 
 const prisma = new PrismaClient();
@@ -141,6 +142,16 @@ export const createAssessment = async (data, createdBy) => {
       message: reportMessage
     }).catch(err => console.error("Failed to send assessment whatsapp notification:", err));
   }
+
+  // App Notification for Leaderboard Update
+  if (member.userId) {
+    sendAppNotification(member.userId, `Your new fitness assessment is recorded! Your leaderboard score was updated (Score: ${final_leaderboard_score}).`, {
+      title: "Leaderboard Updated",
+      reference_type: "LEADERBOARD",
+      reference_id: newAssessment.id
+    }).catch(err => console.error("Failed to send app notification for assessment leaderboard:", err));
+  }
+
 
   // 2. Dispatch Milestone/Target Reached Alert (if body fat percentage drops below 15%)
   if (calculated.metrics.body_fat_percentage <= 15) {

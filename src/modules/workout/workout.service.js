@@ -1,4 +1,7 @@
 import { pool } from "../../config/db.js";
+import { dispatchNotification } from "../../utils/notificationDispatcher.js";
+import { sendAppNotification } from "../../utils/notificationHelper.js";
+
 
 // ----- CREATE WORKOUT PLAN -----
 export const createWorkoutPlanService = async ({ title, notes, branchId, createdBy, exercises }) => {
@@ -58,8 +61,41 @@ export const assignWorkoutPlanService = async (memberId, workoutPlanId) => {
     [workoutPlanId]
   );
 
+  // Fetch member & notify
+  try {
+    const [memberRows] = await pool.query(
+      "SELECT m.id, m.fullName, m.email, m.phone, m.userId FROM member m WHERE m.id = ?",
+      [memberId]
+    );
+    const member = memberRows[0];
+    const planTitle = assignedPlan[0]?.title || "Workout Plan";
+
+    if (member && member.userId) {
+      const messageText = `Hi ${member.fullName},\n\nA new workout plan "${planTitle}" has been assigned to you.`;
+      
+      dispatchNotification({
+        category: "templates",
+        toEmail: member.email,
+        toPhone: member.phone,
+        toUserId: member.userId,
+        memberId: member.id,
+        subject: "New Workout Plan Assigned",
+        message: messageText,
+      }).catch(err => console.error("Failed to dispatch workout assignment notification:", err.message));
+
+      sendAppNotification(member.userId, `A new workout plan "${planTitle}" has been assigned to you.`, {
+        title: "Workout Plan Assigned",
+        reference_type: "WORKOUT_PLAN",
+        reference_id: workoutPlanId
+      }).catch(err => console.error("Failed to send app notification for workout assignment:", err));
+    }
+  } catch (err) {
+    console.error("Error dispatching workout notification:", err.message);
+  }
+
   return assignedPlan;
 };
+
 
 // ----- GET MEMBER WORKOUT PLANS -----
 export const getMemberWorkoutPlanService = async (memberIdParam) => {
