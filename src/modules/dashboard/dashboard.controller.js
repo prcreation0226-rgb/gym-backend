@@ -1,13 +1,6 @@
 import { pool } from "../../config/db.js";
-import { 
-  dashboardService,
-  superAdminDashboardService, 
-  superAdminCRMStatsService,
-  getOverviewService,
-  getMemberGrowthChartService,
-  getRevenueChartService,
-  getProfitChartService
-} from "./dashboard.service.js";
+import { dashboardService,superAdminDashboardService, superAdminCRMStatsService } from "./dashboard.service.js";
+
 export const getDashboardData = async (req, res, next) => {
   try {
     const data = await dashboardService();
@@ -431,74 +424,6 @@ export const getSuperAdminCRMStats = async (req, res, next) => {
     res.json({
       success: true,
       message: "Super Admin CRM stats loaded successfully",
-      data
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const getDashboardOverview = async (req, res, next) => {
-  try {
-    const branchId = req.query.branchId;
-    const startDate = req.query.startDate;
-    const endDate = req.query.endDate;
-    
-    const data = await getOverviewService(branchId, startDate, endDate);
-    res.json({
-      success: true,
-      message: "Dashboard data fetched successfully",
-      data
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const getMemberGrowthChart = async (req, res, next) => {
-  try {
-    const branchId = req.query.branchId;
-    const startDate = req.query.startDate;
-    const endDate = req.query.endDate;
-    
-    const data = await getMemberGrowthChartService(branchId, startDate, endDate);
-    res.json({
-      success: true,
-      message: "Dashboard data fetched successfully",
-      data
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const getRevenueChart = async (req, res, next) => {
-  try {
-    const branchId = req.query.branchId;
-    const startDate = req.query.startDate;
-    const endDate = req.query.endDate;
-    
-    const data = await getRevenueChartService(branchId, startDate, endDate);
-    res.json({
-      success: true,
-      message: "Dashboard data fetched successfully",
-      data
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const getProfitChart = async (req, res, next) => {
-  try {
-    const branchId = req.query.branchId;
-    const startDate = req.query.startDate;
-    const endDate = req.query.endDate;
-    
-    const data = await getProfitChartService(branchId, startDate, endDate);
-    res.json({
-      success: true,
-      message: "Dashboard data fetched successfully",
       data
     });
   } catch (err) {

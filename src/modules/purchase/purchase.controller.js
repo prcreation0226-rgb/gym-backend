@@ -273,7 +273,6 @@ export const updatePurchaseStatus = async (req, res, next) => {
               Name: data.adminName || data.companyName || "Admin",
               PlanName: data.selectedPlan || "N/A",
               Password: tempPassword,
-              LoginUrl: 'http://localhost:5173/login',
               Amount: data.amount || 0
             },
             referenceType: 'SUBSCRIPTION',
