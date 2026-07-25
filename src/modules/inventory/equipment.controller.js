@@ -20,7 +20,8 @@ export const createEquipment = async (req, res, next) => {
     if (req.files?.image) {
       imageUrl = await uploadToCloudinary(req.files.image, "gym_equipment");
     }
-    const equipment = await createEquipmentService({ ...req.body, imageUrl });
+    const adminId = req.user?.adminId || req.user?.id;
+    const equipment = await createEquipmentService({ ...req.body, imageUrl, adminId });
     res.json({ success: true, equipment });
   } catch (err) { next(err); }
 };

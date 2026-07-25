@@ -8,11 +8,27 @@ export const createEquipmentService = async (data) => {
   const {
     name, category, quantity, condition = "Good",
     purchaseDate, purchaseCost, location, maintenanceDueDays = 180,
-    branchId, notes, imageUrl
+    branchId, notes, imageUrl, adminId
   } = data;
 
   if (!name) throw { status: 400, message: "Equipment name is required" };
-  if (!branchId) throw { status: 400, message: "Branch ID is required" };
+
+  let finalBranchId = branchId;
+  if (!finalBranchId) {
+    if (!adminId) throw { status: 400, message: "Branch ID or Admin ID is required" };
+    // Check if admin has any branch
+    const [branches] = await pool.query(`SELECT id FROM branch WHERE adminId = ? LIMIT 1`, [adminId]);
+    if (branches.length > 0) {
+      finalBranchId = branches[0].id;
+    } else {
+      // Create a default branch
+      const [res] = await pool.query(
+        `INSERT INTO branch (name, address, status, adminId) VALUES (?, ?, ?, ?)`,
+        ["Main Branch", "Headquarters", "ACTIVE", adminId]
+      );
+      finalBranchId = res.insertId;
+    }
+  }
 
   const nextMaintenanceDate = data.nextMaintenanceDate || (purchaseDate
     ? new Date(new Date(purchaseDate).getTime() + maintenanceDueDays * 86400000).toISOString().split("T")[0]
@@ -23,7 +39,7 @@ export const createEquipmentService = async (data) => {
      (name, category, quantity, \`condition\`, purchaseDate, purchaseCost, location, nextMaintenanceDate, branchId, notes, imageUrl)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [name, category, quantity || 1, condition, purchaseDate || null, purchaseCost || null,
-     location || null, nextMaintenanceDate, branchId, notes || null, imageUrl || null]
+     location || null, nextMaintenanceDate, finalBranchId, notes || null, imageUrl || null]
   );
 
   const [equipment] = await pool.query(`SELECT * FROM gym_equipment WHERE id = ?`, [result.insertId]);
