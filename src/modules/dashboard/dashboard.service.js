@@ -356,24 +356,42 @@ export const superAdminCRMStatsService = async () => {
   };
 };
 
+// Helper to create admin_activity_logs table if not exists
+const ensureAdminActivityLogsTable = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS admin_activity_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        admin_id INT NOT NULL,
+        action_type VARCHAR(100),
+        description TEXT,
+        reference_id INT,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  } catch (err) {
+    console.error("Error creating admin_activity_logs table:", err.message);
+  }
+};
+
 // Helper for dynamic WHERE clauses
-const buildFilters = (tableAlias, branchId, startDate, endDate, dateCol = 'createdAt') => {
+const buildFilters = (branchAlias, dateAlias, branchId, startDate, endDate, dateCol = 'createdAt') => {
   let query = "";
   const params = [];
   
   if (branchId && branchId !== 'all') {
-    query += ` AND ${tableAlias}.branchId = ?`;
+    query += ` AND ${branchAlias}.branchId = ?`;
     params.push(branchId);
   }
   
   if (startDate && endDate) {
-    query += ` AND DATE(${tableAlias}.${dateCol}) BETWEEN ? AND ?`;
+    query += ` AND DATE(${dateAlias}.${dateCol}) BETWEEN ? AND ?`;
     params.push(startDate, endDate);
   } else if (startDate) {
-    query += ` AND DATE(${tableAlias}.${dateCol}) >= ?`;
+    query += ` AND DATE(${dateAlias}.${dateCol}) >= ?`;
     params.push(startDate);
   } else if (endDate) {
-    query += ` AND DATE(${tableAlias}.${dateCol}) <= ?`;
+    query += ` AND DATE(${dateAlias}.${dateCol}) <= ?`;
     params.push(endDate);
   }
   
@@ -381,12 +399,13 @@ const buildFilters = (tableAlias, branchId, startDate, endDate, dateCol = 'creat
 };
 
 export const getOverviewService = async (branchId, startDate, endDate) => {
-  const memberFilter = buildFilters('m', branchId, startDate, endDate, 'joinDate');
-  const staffFilter = buildFilters('u', branchId, null, null, 'createdAt'); // Staff count is usually total active
-  const checkinFilter = buildFilters('ma', branchId, startDate, endDate, 'checkIn');
-  const staffCheckinFilter = buildFilters('sa', branchId, startDate, endDate, 'checkIn');
-  const revenueFilter = buildFilters('p', branchId, startDate, endDate, 'paymentDate');
-  const expenseFilter = buildFilters('e', branchId, startDate, endDate, 'date');
+  await ensureAdminActivityLogsTable();
+  const memberFilter = buildFilters('m', 'm', branchId, startDate, endDate, 'joinDate');
+  const staffFilter = buildFilters('u', 'u', branchId, null, null, 'createdAt'); // Staff count is usually total active
+  const checkinFilter = buildFilters('ma', 'ma', branchId, startDate, endDate, 'checkIn');
+  const staffCheckinFilter = buildFilters('sa', 'sa', branchId, startDate, endDate, 'checkIn');
+  const revenueFilter = buildFilters('m', 'p', branchId, startDate, endDate, 'paymentDate');
+  const expenseFilter = buildFilters('e', 'e', branchId, startDate, endDate, 'date');
   
   // Parallel execution of all aggregated queries
   const [
@@ -405,7 +424,7 @@ export const getOverviewService = async (branchId, startDate, endDate) => {
     pool.query(`SELECT COUNT(*) AS count FROM staffattendance sa WHERE DATE(sa.checkIn) = CURDATE() ${staffCheckinFilter.query}`, staffCheckinFilter.params),
     // For revenue, assume payment status logic if exists, otherwise sum all (as previously seen)
     // Adding condition to exclude failed/refunded if such column exists, else just normal sum
-    pool.query(`SELECT COALESCE(SUM(p.amount), 0) AS total FROM payment p WHERE 1=1 ${revenueFilter.query}`, revenueFilter.params),
+    pool.query(`SELECT COALESCE(SUM(p.amount), 0) AS total FROM payment p LEFT JOIN member m ON p.memberId = m.id WHERE 1=1 ${revenueFilter.query}`, revenueFilter.params),
     // Expenses
     pool.query(`SELECT COALESCE(SUM(e.amount), 0) AS total FROM expense e WHERE 1=1 ${expenseFilter.query}`, expenseFilter.params),
     
@@ -422,8 +441,9 @@ export const getOverviewService = async (branchId, startDate, endDate) => {
       SELECT p.id as invoiceNumber, m.fullName as memberName, p.amount, p.paymentDate as paidDate, p.paymentMethod, 'Success' as paymentStatus
       FROM payment p
       LEFT JOIN member m ON p.memberId = m.id
+      WHERE 1=1 ${revenueFilter.query}
       ORDER BY p.paymentDate DESC LIMIT 10
-    `)
+    `, revenueFilter.params)
   ]);
 
   const totalRevenue = Number(revenueRow?.total || 0);
@@ -447,7 +467,7 @@ export const getOverviewService = async (branchId, startDate, endDate) => {
 };
 
 export const getMemberGrowthChartService = async (branchId, startDate, endDate) => {
-  const filter = buildFilters('m', branchId, startDate, endDate, 'joinDate');
+  const filter = buildFilters('m', 'm', branchId, startDate, endDate, 'joinDate');
   
   const [rows] = await pool.query(`
     SELECT DATE(m.joinDate) AS date, COUNT(*) AS count
@@ -461,11 +481,12 @@ export const getMemberGrowthChartService = async (branchId, startDate, endDate) 
 };
 
 export const getRevenueChartService = async (branchId, startDate, endDate) => {
-  const filter = buildFilters('p', branchId, startDate, endDate, 'paymentDate');
+  const filter = buildFilters('m', 'p', branchId, startDate, endDate, 'paymentDate');
   
   const [rows] = await pool.query(`
     SELECT DATE(p.paymentDate) AS date, SUM(p.amount) AS revenue
     FROM payment p
+    LEFT JOIN member m ON p.memberId = m.id
     WHERE 1=1 ${filter.query}
     GROUP BY DATE(p.paymentDate)
     ORDER BY DATE(p.paymentDate) ASC
@@ -477,14 +498,16 @@ export const getRevenueChartService = async (branchId, startDate, endDate) => {
 export const getProfitChartService = async (branchId, startDate, endDate) => {
   // To get profit chart correctly, we need revenue and expense by date.
   // We can union them or do a subquery join
-  const revFilter = buildFilters('p', branchId, startDate, endDate, 'paymentDate');
-  const expFilter = buildFilters('e', branchId, startDate, endDate, 'date');
+  const revFilter = buildFilters('m', 'p', branchId, startDate, endDate, 'paymentDate');
+  const expFilter = buildFilters('e', 'e', branchId, startDate, endDate, 'date');
   
   const [rows] = await pool.query(`
     SELECT d.date, SUM(d.revenue) AS revenue, SUM(d.expense) AS expense, (SUM(d.revenue) - SUM(d.expense)) AS profit
     FROM (
       SELECT DATE(p.paymentDate) AS date, p.amount AS revenue, 0 AS expense
-      FROM payment p WHERE 1=1 ${revFilter.query}
+      FROM payment p 
+      LEFT JOIN member m ON p.memberId = m.id
+      WHERE 1=1 ${revFilter.query}
       UNION ALL
       SELECT DATE(e.date) AS date, 0 AS revenue, e.amount AS expense
       FROM expense e WHERE 1=1 ${expFilter.query}
