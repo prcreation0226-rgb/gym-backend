@@ -274,30 +274,44 @@ export const loginUser = async ({ email, password }) => {
     LEFT JOIN role r ON r.id = u.roleId
     LEFT JOIN branch b ON b.id = u.branchId
     WHERE u.email = ?
-    LIMIT 1
+    ORDER BY u.id DESC
   `;
 
   const [rows] = await pool.query(sql, [email]);
-  const user = rows[0];
-
-  if (!user) {
+  
+  if (rows.length === 0) {
     throw { status: 400, message: "User not found" };
   }
 
-  const normStatus = (user.status || '').toLowerCase().trim();
-  if (normStatus === 'inactive') {
-    if (user.trialStatus === 'Expired') {
-      throw { status: 403, message: "Your trial has expired. Please purchase a subscription to continue." };
+  let user = null;
+  let statusError = null;
+
+  // Since emails can be duplicated across tenants, we must find the first one that matches the password.
+  // We order by id DESC to prefer the most recently created account if passwords collide.
+  for (const row of rows) {
+    const match = await bcrypt.compare(password, row.password);
+    if (match) {
+      const normStatus = (row.status || '').toLowerCase().trim();
+      if (normStatus === 'inactive') {
+        if (row.trialStatus === 'Expired') {
+          statusError = { status: 403, message: "Your trial has expired. Please purchase a subscription to continue." };
+        } else {
+          statusError = { status: 403, message: "Your account is inactive. Please contact support." };
+        }
+        continue; // Keep looking for an active account with this password
+      }
+      
+      // Found a matching, active account
+      user = row;
+      break;
     }
-    throw { status: 403, message: "Your account is inactive. Please contact support." };
   }
 
-  /* ===============================
-     2️⃣ PASSWORD CHECK
-  =============================== */
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) {
-    throw { status: 401, message: "Invalid password" };
+  if (!user) {
+    if (statusError) {
+      throw statusError;
+    }
+    throw { status: 401, message: "Invalid password or account" };
   }
 
   /* ===============================
