@@ -201,11 +201,21 @@ export const bookClassService = async (memberId, scheduleId) => {
   await connection.beginTransaction();
 
   try {
-    /* 1️⃣ MAP userId/memberId → member.id */
-    const [memberRows] = await connection.query(
+    /* 1️⃣ MAP userId/memberId → member.id
+       Frontend may send either member.id OR user.id (userId).
+       Try member.id first, fallback to member.userId lookup. */
+    let [memberRows] = await connection.query(
       "SELECT id, userId, fullName, email, phone, branchId, adminId FROM member WHERE id = ?",
       [memberId]
     );
+
+    // Fallback: treat memberId as userId and look up the member
+    if (memberRows.length === 0) {
+      [memberRows] = await connection.query(
+        "SELECT id, userId, fullName, email, phone, branchId, adminId FROM member WHERE userId = ?",
+        [memberId]
+      );
+    }
 
     if (memberRows.length === 0) {
       throw { status: 400, message: "Member profile not found for this user" };
