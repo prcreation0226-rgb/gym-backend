@@ -43,6 +43,13 @@ async function runStartupMigrations() {
     // Column already exists — safe to ignore
   }
 
+  // Alter plan table for discountPercent
+  try {
+    await pool.query("ALTER TABLE plan ADD COLUMN discountPercent DECIMAL(5,2) DEFAULT 0");
+  } catch (e) {
+    // Column already exists — safe to ignore
+  }
+
   // Create app_notification table
   try {
     await pool.query(`
