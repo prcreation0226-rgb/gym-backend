@@ -104,9 +104,10 @@ export const getTasksByAdminId = async (req, res) => {
     const tasks = await getTasksByAdminIdService(adminId);
 
     if (!tasks || tasks.length === 0) {
-      return res.status(404).json({
-        success: false,
+      return res.status(200).json({
+        success: true,
         message: "No tasks found for this admin",
+        data: []
       });
     }
 
@@ -123,7 +124,9 @@ export const getTasksByAdminId = async (req, res) => {
 
 export const getAllTasks = async (req, res) => {
   try {
-    const tasks = await getAllTasksService();
+    const adminId = req.user?.adminId || req.user?.id;
+    const userRole = req.user?.role;
+    const tasks = await getAllTasksService(adminId, userRole);
     return res.json({
       success: true,
       data: tasks,

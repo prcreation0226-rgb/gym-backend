@@ -7,7 +7,8 @@ export const getFinanceReport = async (req, res, next) => {
         ? parseInt(req.params.branchId)
         : req.user.branchId;
 
-    const report = await financeReportService(branchId);
+    const adminId = req.user?.adminId || req.user?.id;
+    const report = await financeReportService(adminId, branchId);
     res.json({ success: true, finance: report });
   } catch (err) {
     next(err);

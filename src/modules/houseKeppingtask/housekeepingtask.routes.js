@@ -1,5 +1,5 @@
 import express from "express";
-// import auth from "../middleware/auth.js"; // login middleware
+import { verifyToken } from "../../middlewares/auth.js";
 
 import {
   createTask,
@@ -15,14 +15,14 @@ import {
 
 const router = express.Router();
 
-router.post("/create", createTask);
-router.get("/all", getAllTasks);
-router.get("/:id", getTaskById);
-router.get("/branch/:branchId", getTaskByBranchID);
-router.get("/tasks/admin/:adminId", getTasksByAdminId);
-router.get("/asignedto/:asignedtoID", getTaskAsignedTo);
-router.put("/:id", updateTask);
-router.put("/status/:id", updateTaskStatus);
-router.delete("/:id", deleteTask);
+router.post("/create", verifyToken(["Superadmin", "Admin", "Subadmin", "Manager"]), createTask);
+router.get("/all", verifyToken(["Superadmin", "Admin", "Subadmin", "Manager"]), getAllTasks);
+router.get("/:id", verifyToken(["Superadmin", "Admin", "Subadmin", "Manager", "Staff", "GeneralTrainer", "PersonalTrainer", "Receptionist", "SalesAgent"]), getTaskById);
+router.get("/branch/:branchId", verifyToken(["Superadmin", "Admin", "Subadmin", "Manager"]), getTaskByBranchID);
+router.get("/tasks/admin/:adminId", verifyToken(["Superadmin", "Admin", "Subadmin", "Manager"]), getTasksByAdminId);
+router.get("/asignedto/:asignedtoID", verifyToken(["Superadmin", "Admin", "Subadmin", "Manager", "Staff", "GeneralTrainer", "PersonalTrainer", "Receptionist", "SalesAgent"]), getTaskAsignedTo);
+router.put("/:id", verifyToken(["Superadmin", "Admin", "Subadmin", "Manager"]), updateTask);
+router.put("/status/:id", verifyToken(["Superadmin", "Admin", "Subadmin", "Manager", "Staff", "GeneralTrainer", "PersonalTrainer", "Receptionist", "SalesAgent"]), updateTaskStatus);
+router.delete("/:id", verifyToken(["Superadmin", "Admin", "Subadmin", "Manager"]), deleteTask);
 
 export default router;

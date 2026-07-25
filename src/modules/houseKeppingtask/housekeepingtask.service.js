@@ -125,8 +125,14 @@ export const getTasksByAdminIdService = async (adminId) => {
     );
   }
 };
-export const getAllTasksService = async () => {
-  const [rows] = await pool.query(`SELECT * FROM tasks ORDER BY id DESC`);
+export const getAllTasksService = async (adminId, userRole) => {
+  let query = `SELECT * FROM tasks ORDER BY id DESC`;
+  let params = [];
+  if (userRole !== "Superadmin") {
+    query = `SELECT * FROM tasks WHERE createdById = ? ORDER BY id DESC`;
+    params = [adminId];
+  }
+  const [rows] = await pool.query(query, params);
   return rows;
 };
 
@@ -141,7 +147,7 @@ export const getTaskByBranchIdService = async (branchId) => {
 export const getTaskAsignedService = async (userId) => {
   // Fetch staffId and roleId based on userId
   const [staffRows] = await pool.query(
-    `SELECT staff.id as staffId, user.roleId 
+    `SELECT staff.id as staffId, staff.adminId, user.roleId 
      FROM user 
      LEFT JOIN staff ON staff.userId = user.id 
      WHERE user.id = ?`,
@@ -154,10 +160,11 @@ export const getTaskAsignedService = async (userId) => {
   
   const staffId = staffRows[0].staffId;
   const roleId = staffRows[0].roleId;
+  const adminId = staffRows[0].adminId;
 
   const [rows] = await pool.query(
-    `SELECT * FROM tasks WHERE assignedTo = ? OR roleId = ? ORDER BY id DESC`,
-    [staffId, roleId]
+    `SELECT * FROM tasks WHERE createdById = ? AND (assignedTo = ? OR roleId = ?) ORDER BY id DESC`,
+    [adminId, staffId, roleId]
   );
   return rows;
 };
