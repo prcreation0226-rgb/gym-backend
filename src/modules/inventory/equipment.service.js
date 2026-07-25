@@ -1,4 +1,5 @@
 import { pool } from "../../config/db.js";
+import { sendAppNotification } from "../../utils/notificationHelper.js";
 
 // ==============================
 // EQUIPMENT CRUD
@@ -207,12 +208,16 @@ export const createItemRequestService = async (data) => {
 
   // 👉 Send Push Notification to Gym Admin (Bell Icon)
   if (adminId) {
-    const notifMessage = `New inventory request: ${quantity}x ${itemName} by ${role} (ID: ${requestedBy})`;
-    await pool.query(
-      `INSERT INTO notificationlog (type, \`to\`, message, status, createdAt)
-       VALUES (?, ?, ?, ?, NOW())`,
-      ["IN-APP", adminId.toString(), notifMessage, "UNREAD"]
-    );
+    let staffName = role;
+    const [userRows] = await pool.query(`SELECT fullName FROM user WHERE id = ?`, [requestedBy]);
+    if (userRows.length > 0) staffName = userRows[0].fullName;
+
+    const notifMessage = `New inventory request: ${quantity}x ${itemName} by ${staffName}`;
+    await sendAppNotification(adminId, notifMessage, {
+      title: "New Equipment Request",
+      reference_type: "EQUIPMENT_REQUEST",
+      reference_id: result.insertId
+    });
   }
 
   return req[0];
@@ -245,7 +250,21 @@ export const updateItemRequestStatusService = async (id, status, adminRemarks) =
   );
 
   const [req] = await pool.query(`SELECT * FROM equipment_requests WHERE id = ?`, [id]);
-  return req[0];
+  const requestDetails = req[0];
+
+  // 👉 Send Push Notification to Staff/Member who requested it
+  if (requestDetails && requestDetails.requestedBy && ["APPROVED", "REJECTED"].includes(status)) {
+    const title = status === "APPROVED" ? "Equipment Request Approved" : "Equipment Request Rejected";
+    const msg = `Your request for ${requestDetails.quantity}x ${requestDetails.itemName} has been ${status.toLowerCase()}.`;
+    await sendAppNotification(requestDetails.requestedBy, msg, {
+      title,
+      sender_id: requestDetails.adminId,
+      reference_type: "EQUIPMENT_REQUEST",
+      reference_id: id
+    });
+  }
+
+  return requestDetails;
 };
 
 export const getMemberItemRequestsService = async (userId, isStaff) => {
