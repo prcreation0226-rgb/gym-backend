@@ -939,7 +939,7 @@ export const getDashboardDataService = async (adminId, attendancePeriod = "7days
     const [attendanceData] = await pool.query(
       `
       SELECT 
-        DATE_FORMAT(CONVERT_TZ(ma.checkIn, '+00:00', '+05:30'), '%Y-%m-%d') AS date,
+        DATE(CONVERT_TZ(ma.checkIn, '+00:00', '+05:30')) AS date,
         COUNT(*) AS count
       FROM memberattendance ma
       JOIN member m ON ma.memberId = m.id
@@ -981,10 +981,10 @@ export const getDashboardDataService = async (adminId, attendancePeriod = "7days
       FROM classschedule cs
       JOIN user u ON cs.trainerId = u.id
       WHERE u.adminId = ?
-        AND cs.date >= ? - INTERVAL 30 DAY
+        AND cs.date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
       GROUP BY cs.className
       `,
-      [adminId, todayStr]
+      [adminId]
     );
 
     const classDistribution = classData.map((c) => ({
