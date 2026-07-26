@@ -237,8 +237,8 @@ export const memberCheckIn = async (req, res, next) => {
     // Send check-in notification to member
     if (isMember && memberRecords && memberRecords.length > 0) {
       const member = memberRecords[0];
-      const checkInTime = finalCheckIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const checkInDate = finalCheckIn.toLocaleDateString();
+      const checkInTime = finalCheckIn.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
+      const checkInDate = finalCheckIn.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
       const message = `Hi ${member.fullName},\n\nYour attendance has been successfully marked for today (${checkInDate}) at ${checkInTime}.\n\nHave a great workout!`;
 
       dispatchNotification({
@@ -263,7 +263,7 @@ export const memberCheckIn = async (req, res, next) => {
 
       // Send app notification to admin and their staff
       const attName = isMember ? memberRecords[0].fullName : (typeof userRecords !== 'undefined' ? userRecords[0].fullName : "User");
-      const checkInTime = finalCheckIn.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const checkInTime = finalCheckIn.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
       await notifyAdminAndStaff(adminToNotify, `${attName} has checked in at ${checkInTime}.`, {
         title: "New Check-In",
         reference_type: "ATTENDANCE"

@@ -176,9 +176,9 @@ export const markAllAsRead = async (tenantId, receiverId, receiverRole) => {
   const sql = `
     UPDATE app_notification 
     SET isRead = TRUE, readAt = NOW() 
-    WHERE tenantId = ? AND receiverId = ? AND receiverRole = ? AND isRead = FALSE
+    WHERE tenantId = ? AND receiverId = ? AND isRead = FALSE
   `;
-  const [result] = await pool.query(sql, [tenantId, receiverId, receiverRole]);
+  const [result] = await pool.query(sql, [tenantId, receiverId]);
   
   if (result.affectedRows > 0) {
     emitToUser(receiverId.toString(), "all_notifications_read", {});
