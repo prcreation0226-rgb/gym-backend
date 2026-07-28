@@ -45,6 +45,12 @@ export const sendNotification = async (req, res, next) => {
       tenantId,
       senderId: req.user?.id,
     });
+
+    // If email was skipped due to missing SMTP config, return 200 (not 500)
+    if (log && log.skipped) {
+      return res.json({ success: false, skipped: true, message: log.reason || 'Email skipped: SMTP not configured on server.' });
+    }
+
     res.json({ success: true, log });
   } catch (err) {
     next(err);

@@ -124,19 +124,33 @@ export const sendNotificationService = async ({ type, to, message, memberId, sub
         return { success: false, reason: "Invalid email address: " + to };
       }
 
+      // Guard: if SMTP is not configured, skip gracefully instead of crashing
+      const smtpHost = process.env.SMTP_HOST;
+      const smtpUser = process.env.SMTP_USER;
+      const smtpPass = process.env.SMTP_PASS;
+
+      if (!smtpHost || !smtpUser || !smtpPass) {
+        await pool.query(
+          `UPDATE notificationlog SET status = 'SKIPPED', error = ? WHERE id = ?`,
+          ['SMTP not configured on server (SMTP_HOST/SMTP_USER/SMTP_PASS missing)', logId]
+        );
+        console.warn(`⚠️  EMAIL to ${to} SKIPPED — SMTP credentials not set in environment.`);
+        return { success: false, skipped: true, reason: 'SMTP not configured on server. Set SMTP_HOST, SMTP_USER, SMTP_PASS environment variables.' };
+      }
+
       const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
+        host: smtpHost,
         port: Number(process.env.SMTP_PORT) || 587,
-        secure: false,
+        secure: process.env.SMTP_SECURE === 'true',
         auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
+          user: smtpUser,
+          pass: smtpPass,
         },
         tls: { rejectUnauthorized: false }
       });
 
       await transporter.sendMail({
-        from: process.env.MAIL_FROM || "GymSoft <noreply@gymsoftware.space>",
+        from: process.env.MAIL_FROM || `GymSoft <${smtpUser}>`,
         to,
         subject: subject || "GymSoft — Gym Notification",
         text: message,
