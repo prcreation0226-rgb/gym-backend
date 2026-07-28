@@ -142,18 +142,18 @@ export const registerUser = async (data,payload) => {
       toEmail: email,
       toPhone: phone || null,
       toUserId: result.insertId,
-      subject: welcomeTemplate.subject || "Welcome to Speed Fitness!",
+      subject: welcomeTemplate.subject || "Welcome to GymSoft!",
       message: msgBody,
     }).catch(err => console.error("❌ Error sending admin trial welcome notification:", err.message));
   } else if (roleId == 2 || roleId == '2') {
     // Admin registered without trial – still send a welcome email with credentials
-    const credMsg = `Hi ${fullName},\n\nYour gym admin account has been created successfully.\n\nLogin Details:\nEmail: ${email}\nPassword: ${data.password}\n\nGym: ${gymName || 'N/A'}\n\nRegards,\nSpeed Fitness Team`;
+    const credMsg = `Hi ${fullName},\n\nYour gym admin account has been created successfully.\n\nLogin Details:\nEmail: ${email}\nPassword: ${data.password}\n\nGym: ${gymName || 'N/A'}\n\nRegards,\nGymSoft Team`;
     dispatchNotification({
       category: "saas_renewal_channel",
       toEmail: email,
       toPhone: phone || null,
       toUserId: result.insertId,
-      subject: "Your Gym Admin Account — Speed Fitness",
+      subject: "Your Gym Admin Account — GymSoft",
       message: credMsg,
     }).catch(err => console.error("❌ Error sending admin welcome email:", err.message));
   }
@@ -162,7 +162,7 @@ export const registerUser = async (data,payload) => {
   if (roleId == 2 || roleId == '2') {
     try {
       await pool.query(
-        "INSERT INTO app_notification (tenantId, receiverId, receiverRole, type, title, message, referenceType, referenceId, isRead, createdAt) VALUES (?, ?, 'Admin', 'SYSTEM_ALERT', 'Welcome to Speed Fitness!', ?, 'SYSTEM', '1', FALSE, NOW())",
+        "INSERT INTO app_notification (tenantId, receiverId, receiverRole, type, title, message, referenceType, referenceId, isRead, createdAt) VALUES (?, ?, 'Admin', 'SYSTEM_ALERT', 'Welcome to GymSoft!', ?, 'SYSTEM', '1', FALSE, NOW())",
         [result.insertId, result.insertId, `Hi ${fullName}, welcome aboard! We are excited to have ${gymName || 'your gym'} with us. Let's get started!`]
       );
     } catch (e) {
@@ -686,7 +686,7 @@ if (data?.subscriptionPlan) {
         toEmail: user.email,
         toPhone: user.phone || null,
         toUserId: id,
-        subject: template.subject || "Subscription Activated — Speed Fitness",
+        subject: template.subject || "Subscription Activated — GymSoft",
         message: msgBody,
       }).catch(err => console.error("❌ Error sending subscription activation notification:", err.message));
     }

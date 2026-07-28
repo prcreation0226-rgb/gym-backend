@@ -1,4 +1,5 @@
 import { pool } from "../../config/db.js";
+import { calculateAttendanceStats } from "../../utils/attendance.util.js";
 
 export const getAlerts = async (req, res, next) => {
   try {
@@ -30,16 +31,10 @@ export const getVulnerableMembers = async (req, res, next) => {
     const adminId = isSuper ? null : (isAdmin ? req.user?.id : req.user?.adminId);
     const branchId = isSuper ? null : req.user?.branchId;
     
-    // Calculate attendance over the last 30 days
     let sql = `
-      SELECT m.id, m.fullName, m.email, m.phone, m.branchId, m.profileImage,
-             COALESCE(
-               DATEDIFF(CURDATE(), (SELECT MAX(checkIn) FROM memberattendance WHERE memberId = m.id)),
-               16
-             ) AS daysAbsent,
-             COUNT(a.id) AS totalAttendanceIn30Days
+      SELECT m.id, m.fullName, m.email, m.phone, m.branchId, m.profileImage, m.membershipFrom, m.membershipTo,
+             (SELECT MAX(checkIn) FROM memberattendance WHERE memberId = m.id) as lastCheckIn
       FROM member m
-      LEFT JOIN memberattendance a ON m.id = a.memberId AND a.checkIn >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
       WHERE UPPER(m.status) = 'ACTIVE'
     `;
     
@@ -55,33 +50,61 @@ export const getVulnerableMembers = async (req, res, next) => {
       params.push(branchId);
     }
     
-    sql += ` GROUP BY m.id`;
-
     const [rows] = await pool.query(sql, params);
 
-    // Calculate badges
+    const memberIds = rows.map(m => m.id);
+    let attendances = [];
+    if (memberIds.length > 0) {
+      const [attRows] = await pool.query(`
+        SELECT memberId, checkIn 
+        FROM memberattendance 
+        WHERE checkIn >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) 
+        AND memberId IN (?)
+      `, [memberIds]);
+      attendances = attRows;
+    }
+
+    const attByMember = {};
+    attendances.forEach(a => {
+      if (!attByMember[a.memberId]) attByMember[a.memberId] = [];
+      attByMember[a.memberId].push(a);
+    });
+
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
     const members = rows.map(m => {
-      // Assuming 26 working days in a month.
-      let attendancePercentage = (m.totalAttendanceIn30Days / 26) * 100;
-      if (attendancePercentage > 100) attendancePercentage = 100;
+      let daysAbsent = 16; // default if never checked in
+      if (m.lastCheckIn) {
+        const diffTime = Math.abs(today - new Date(m.lastCheckIn));
+        daysAbsent = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+
+      const memberAttendances = attByMember[m.id] || [];
+      const stats = calculateAttendanceStats(m, thirtyDaysAgo, today, memberAttendances);
 
       let badge = 'Green';
-      // Red: < 40% attendance or absent for 15+ days (including dummy members never checked in)
-      if (attendancePercentage < 40 || m.daysAbsent >= 15) {
+      // Red: < 40% attendance or absent for 15+ days
+      if (stats.attendancePercentage < 40 || daysAbsent >= 15) {
         badge = 'Red';
       } 
       // Yellow: 40-75% attendance or absent for 7+ days
-      else if (attendancePercentage <= 75 || m.daysAbsent >= 7) {
+      else if (stats.attendancePercentage <= 75 || daysAbsent >= 7) {
         badge = 'Yellow';
       }
       // Blue: < 90% attendance or absent for 3+ days
-      else if (attendancePercentage < 90 || m.daysAbsent >= 3) {
+      else if (stats.attendancePercentage < 90 || daysAbsent >= 3) {
         badge = 'Blue';
       }
 
       return { 
         ...m, 
-        attendancePercentage: Math.round(attendancePercentage), 
+        attendancePercentage: stats.attendancePercentage,
+        totalApplicableDays: stats.totalApplicableDays,
+        presentDays: stats.presentDays,
+        absentDays: stats.absentDays,
+        daysAbsent,
         badge 
       };
     });

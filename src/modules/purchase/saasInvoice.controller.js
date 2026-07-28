@@ -38,8 +38,8 @@ export const generateSaasInvoicePdf = async (req, res, next) => {
     // Platform / Super Admin details (Fetch from user with roleId = 1)
     const [saRows] = await pool.query("SELECT gymName, gymAddress, gstNumber, phone, email FROM user WHERE roleId = 1 LIMIT 1");
     const sa = saRows[0] || {};
-    const companyName = sa.gymName || "Speed Fitness Software Solutions";
-    const companyAddress = sa.gymAddress || "Speed Fitness HQ, India";
+    const companyName = sa.gymName || "GymSoft Software Solutions";
+    const companyAddress = sa.gymAddress || "GymSoft HQ, India";
     const companyGST = sa.gstNumber || "29ABCDE1234F1Z5";
     const companyPhone = sa.phone || "+91 9876543210";
     const companyEmail = sa.email || "support@speedfitness.com";
@@ -240,7 +240,7 @@ export const generateSaasInvoicePdf = async (req, res, next) => {
       .font("Helvetica")
       .fontSize(9)
       .fillColor("#4b5563")
-      .text("Thank you for using Speed Fitness Cloud Software!", 50, doc.y, { align: "center" });
+      .text("Thank you for using GymSoft Cloud Software!", 50, doc.y, { align: "center" });
 
     doc.end();
   } catch (error) {

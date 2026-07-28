@@ -1,5 +1,6 @@
 // src/modules/member/memberDashboard.service.js
 import { pool } from "../../config/db.js";
+import { calculateAttendanceStats } from "../../utils/attendance.util.js";
 
 export const getMemberDashboardService = async (memberId, adminId) => {
   /* 1️⃣ MEMBER */
@@ -32,33 +33,22 @@ export const getMemberDashboardService = async (memberId, adminId) => {
   /* 2️⃣ WORKOUT PROGRESS */
   const [attendanceRows] = await pool.query(
     `
-    SELECT DATE(checkIn) AS date, COUNT(*) AS count
+    SELECT checkIn
     FROM memberattendance
     WHERE memberId = ?
       AND checkIn >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-    GROUP BY DATE(checkIn)
     `,
     [memberId]
   );
 
-  const days = [];
   const today = new Date();
+  const sixDaysAgo = new Date();
+  sixDaysAgo.setDate(today.getDate() - 6);
 
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(today.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-
-    const found = attendanceRows.find(
-      (r) => r.date.toISOString().slice(0, 10) === key
-    );
-
-    days.push({
-      date: key,
-      dayLabel: d.toLocaleDateString("en-US", { weekday: "short" }),
-      checkIns: found ? found.count : 0,
-    });
-  }
+  // Use the new utility to calculate precise attendance statuses
+  // Requires importing calculateAttendanceStats at the top
+  const stats = calculateAttendanceStats(member, sixDaysAgo, today, attendanceRows);
+  const days = stats.dailyStatuses;
 
   /* 3️⃣ CLASSES THIS WEEK */
   const [[classesRow]] = await pool.query(

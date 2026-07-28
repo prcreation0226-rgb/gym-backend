@@ -15,7 +15,7 @@ const buildEmailHtml = (subject, message) => {
       <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
         <tr>
           <td style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:28px 32px;">
-            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">💪 Speed Fitness</h1>
+            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">💪 GymSoft</h1>
             <p style="margin:4px 0 0;color:#e0e7ff;font-size:13px;">Your Fitness Partner</p>
           </td>
         </tr>
@@ -27,7 +27,7 @@ const buildEmailHtml = (subject, message) => {
         </tr>
         <tr>
           <td style="background:#f9fafb;padding:20px 32px;border-top:1px solid #e5e7eb;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;">This is an automated message from Speed Fitness Gym Management. Please do not reply.</p>
+            <p style="margin:0;color:#9ca3af;font-size:12px;">This is an automated message from GymSoft Gym Management. Please do not reply.</p>
           </td>
         </tr>
       </table>
@@ -113,7 +113,7 @@ export const dispatchNotification = async ({
   toPhone,
   toUserId,
   memberId,
-  subject = "Speed Fitness — Gym Notification",
+  subject = "GymSoft — Gym Notification",
   message,
   customChannels,
   adminIdForCredits = null,
@@ -172,7 +172,7 @@ export const dispatchNotification = async ({
       });
 
       await transporter.sendMail({
-        from: process.env.MAIL_FROM || "Speed Fitness <noreply@gymsoftware.space>",
+        from: process.env.MAIL_FROM || "GymSoft <noreply@gymsoftware.space>",
         to: toEmail,
         subject,
         text: message,
@@ -180,7 +180,7 @@ export const dispatchNotification = async ({
       });
 
       await pool.query(
-        "INSERT INTO notificationLog (type, `to`, message, memberId, status) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO notificationlog (type, `to`, message, memberId, status) VALUES (?, ?, ?, ?, ?)",
         ["EMAIL", toEmail, message, memberId || null, "SENT"]
       );
       results.email = { success: true };
@@ -189,7 +189,7 @@ export const dispatchNotification = async ({
       console.error(`❌ Email failed for ${toEmail}:`, err.message);
       results.email = { success: false, error: err.message };
       await pool.query(
-        "INSERT INTO notificationLog (type, `to`, message, memberId, status) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO notificationlog (type, `to`, message, memberId, status) VALUES (?, ?, ?, ?, ?)",
         ["EMAIL", toEmail, message, memberId || null, "FAILED"]
       ).catch(() => {});
     }
@@ -232,14 +232,14 @@ export const dispatchNotification = async ({
           const threshold = autoRows[0]?.lowCreditThreshold || 50;
           if (credits <= threshold) {
             await pool.query(
-              "INSERT INTO notificationLog (type, `to`, message, status) VALUES (?, ?, ?, ?)",
+              "INSERT INTO notificationlog (type, `to`, message, status) VALUES (?, ?, ?, ?)",
               ["IN-APP", adminId.toString(), `⚠️ Low WhatsApp Credits: Only ${credits} remaining. Please recharge.`, "UNREAD"]
             ).catch(() => {});
           }
         }
 
         await pool.query(
-          "INSERT INTO notificationLog (type, `to`, message, memberId, status) VALUES (?, ?, ?, ?, ?)",
+          "INSERT INTO notificationlog (type, `to`, message, memberId, status) VALUES (?, ?, ?, ?, ?)",
           ["WHATSAPP", toPhone, message, memberId || null, isSent ? "SENT" : "FAILED"]
         );
         results.whatsapp = { success: isSent };
@@ -266,7 +266,7 @@ export const dispatchNotification = async ({
   if (needsInApp && toUserId) {
     try {
       const [result] = await pool.query(
-        "INSERT INTO notificationLog (type, `to`, message, memberId, status, is_read) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO notificationlog (type, `to`, message, memberId, status, is_read) VALUES (?, ?, ?, ?, ?, ?)",
         ["IN-APP", toUserId.toString(), message, memberId || null, "UNREAD", 0]
       );
       results.inApp = { success: true };

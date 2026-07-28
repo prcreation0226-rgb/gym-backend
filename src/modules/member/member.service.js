@@ -1004,7 +1004,7 @@ export const deleteMemberService = async (id) => {
       ["DELETE FROM payment WHERE memberId = ?", [id]],
       ["DELETE FROM booking_requests WHERE memberId = ?", [id]],
       ["DELETE FROM member_plan_assignment WHERE memberId = ?", [id]],
-      ["DELETE FROM notificationLog WHERE memberId = ?", [id]],
+      ["DELETE FROM notificationlog WHERE memberId = ?", [id]],
       ["DELETE FROM personal_notification WHERE memberId = ?", [id]],
       ["DELETE FROM assessment WHERE memberId = ?", [id]],
       ["DELETE FROM health_metrics WHERE memberId = ?", [id]],

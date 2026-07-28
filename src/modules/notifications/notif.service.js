@@ -20,7 +20,7 @@ const buildEmailHtml = (message) => {
         <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);">
           <tr>
             <td style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:28px 32px;">
-              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">💪 Speed Fitness</h1>
+              <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">💪 GymSoft</h1>
               <p style="margin:4px 0 0;color:#e0e7ff;font-size:13px;">Your Fitness Partner</p>
             </td>
           </tr>
@@ -31,7 +31,7 @@ const buildEmailHtml = (message) => {
           </tr>
           <tr>
             <td style="background:#f9fafb;padding:20px 32px;border-top:1px solid #e5e7eb;">
-              <p style="margin:0;color:#9ca3af;font-size:12px;">This is an automated message from Speed Fitness Gym Management System.</p>
+              <p style="margin:0;color:#9ca3af;font-size:12px;">This is an automated message from GymSoft Gym Management System.</p>
             </td>
           </tr>
         </table>
@@ -90,8 +90,10 @@ const sendWhatsAppViaApi = async (phone, message, token, phoneNumberId) => {
  * @param {string} params.message
  * @param {number} [params.memberId]
  * @param {string} [params.subject]
+ * @param {number} [params.tenantId]
+ * @param {number} [params.senderId]
  */
-export const sendNotificationService = async ({ type, to, message, memberId, subject }) => {
+export const sendNotificationService = async ({ type, to, message, memberId, subject, tenantId, senderId }) => {
   // Validate memberId exists in member table to prevent FK constraint failures
   let validMemberId = null;
   if (memberId) {
@@ -107,7 +109,7 @@ export const sendNotificationService = async ({ type, to, message, memberId, sub
 
   // Log with PENDING status first
   const [logResult] = await pool.query(
-    `INSERT INTO notificationLog (type, \`to\`, message, memberId, status) VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO notificationlog (type, \`to\`, message, memberId, status) VALUES (?, ?, ?, ?, ?)`,
     [type, to, message, validMemberId, "PENDING"]
   );
   const logId = logResult.insertId;
@@ -118,7 +120,7 @@ export const sendNotificationService = async ({ type, to, message, memberId, sub
     // ────────────────────────────────────────────
     if (type === "EMAIL") {
       if (!to || !to.includes("@")) {
-        await pool.query(`UPDATE notificationLog SET status = 'FAILED' WHERE id = ?`, [logId]);
+        await pool.query(`UPDATE notificationlog SET status = 'FAILED' WHERE id = ?`, [logId]);
         return { success: false, reason: "Invalid email address: " + to };
       }
 
@@ -134,14 +136,14 @@ export const sendNotificationService = async ({ type, to, message, memberId, sub
       });
 
       await transporter.sendMail({
-        from: process.env.MAIL_FROM || "Speed Fitness <noreply@gymsoftware.space>",
+        from: process.env.MAIL_FROM || "GymSoft <noreply@gymsoftware.space>",
         to,
-        subject: subject || "Speed Fitness — Gym Notification",
+        subject: subject || "GymSoft — Gym Notification",
         text: message,
         html: buildEmailHtml(message),
       });
 
-      await pool.query(`UPDATE notificationLog SET status = 'SENT' WHERE id = ?`, [logId]);
+      await pool.query(`UPDATE notificationlog SET status = 'SENT' WHERE id = ?`, [logId]);
       console.log(`✉️ Email sent to ${to}`);
       return { success: true };
     }
@@ -152,37 +154,68 @@ export const sendNotificationService = async ({ type, to, message, memberId, sub
     else if (type === "WHATSAPP") {
       const isSent = await sendWhatsAppViaApi(to, message, null, null);
       const status = isSent ? "SENT" : "FAILED";
-      await pool.query(`UPDATE notificationLog SET status = ? WHERE id = ?`, [status, logId]);
+      await pool.query(`UPDATE notificationlog SET status = ? WHERE id = ?`, [status, logId]);
       return { success: isSent, status };
     }
 
     // ────────────────────────────────────────────
-    // 3. IN_APP  →  Bell Icon (notificationlog UNREAD)
+    // 3. IN_APP  →  Bell Icon (app_notification & notificationlog)
     // ────────────────────────────────────────────
     else if (type === "IN_APP" || type === "IN-APP" || type === "APP_PUSH") {
       await pool.query(
-        `UPDATE notificationLog SET type = 'IN_APP', status = 'UNREAD' WHERE id = ?`,
+        `UPDATE notificationlog SET type = 'IN_APP', status = 'UNREAD' WHERE id = ?`,
         [logId]
       );
-      // Real-time socket push if userId is numeric
-      const numericId = parseInt(to);
-      if (!isNaN(numericId)) {
-        emitToUser(numericId, "new_notification", {
-          id: logId,
-          type: "IN_APP",
-          to,
-          message,
-          status: "UNREAD",
-          createdAt: new Date().toISOString(),
-        });
+      
+      const numericId = parseInt(to); // This is the user id
+      
+      if (!isNaN(numericId) && tenantId) {
+        try {
+          await createAppNotification({
+            tenantId,
+            senderId,
+            receiverId: numericId,
+            receiverRole: 'Member',
+            type: 'MEMBER_MESSAGE',
+            title: subject || 'Message from Admin',
+            message: message,
+            referenceType: 'AT_RISK_MEMBER',
+            referenceId: memberId || null,
+            priority: 'HIGH'
+          });
+          console.log(`🔔 IN_APP notification created in app_notification for user: ${numericId}`);
+        } catch (err) {
+          console.error("Failed to create app notification:", err);
+          // Fallback to legacy emit
+          emitToUser(numericId, "new_notification", {
+            id: logId,
+            type: "IN_APP",
+            to,
+            message,
+            status: "UNREAD",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      } else {
+        // Real-time socket push legacy fallback if tenantId missing
+        if (!isNaN(numericId)) {
+          emitToUser(numericId, "new_notification", {
+            id: logId,
+            type: "IN_APP",
+            to,
+            message,
+            status: "UNREAD",
+            createdAt: new Date().toISOString(),
+          });
+        }
+        console.log(`🔔 IN_APP legacy notification logged for user: ${to}`);
       }
-      console.log(`🔔 IN_APP notification logged for user: ${to}`);
     }
 
     return { id: logId, type, to, message, memberId, status: "SENT" };
   } catch (err) {
     await pool.query(
-      `UPDATE notificationLog SET status = 'FAILED', error = ? WHERE id = ?`,
+      `UPDATE notificationlog SET status = 'FAILED', error = ? WHERE id = ?`,
       [err.message, logId]
     );
     console.error(`❌ Notification FAILED [${type}] to ${to}:`, err.message);

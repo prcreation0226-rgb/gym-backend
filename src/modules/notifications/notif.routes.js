@@ -109,8 +109,8 @@ router.post(
       const result = await sendNotificationService({
         type,
         to,
-        message: `✅ Test notification from Speed Fitness Gym Software!\n\nThis is a test ${type} message sent at ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`,
-        subject: "Speed Fitness — Test Notification",
+        message: `✅ Test notification from GymSoft Gym Software!\n\nThis is a test ${type} message sent at ${new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`,
+        subject: "GymSoft — Test Notification",
       });
       res.json({ success: true, message: `Test ${type} dispatched successfully`, result });
     } catch (err) {

@@ -8,6 +8,10 @@ export const createLog = async (req, res) => {
       return res.status(400).json({ status: false, message: 'memberId is required' });
     }
 
+    if (!req.body.neck_cm || !req.body.waist_cm) {
+      return res.status(400).json({ status: false, message: 'Neck (cm) and Waist (cm) are strictly required for Bodybuilder Assessments.' });
+    }
+
     // Run the calculation engine to calculate derived metrics and check validity
     let calculatedMetrics;
     try {

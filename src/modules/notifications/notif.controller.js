@@ -14,10 +14,37 @@ import {
   markAllAsReadService
 } from "./notif.service.js";
 import { uploadToCloudinary } from "../../config/cloudinary.js";
+import { pool } from "../../config/db.js";
 
 export const sendNotification = async (req, res, next) => {
   try {
-    const log = await sendNotificationService(req.body);
+    const { memberId, type } = req.body;
+    let tenantId = req.user?.roleId === 2 ? req.user.id : req.user?.adminId;
+
+    if (memberId && (type === "IN_APP" || type === "IN-APP")) {
+      const [member] = await pool.query('SELECT userId, adminId FROM member WHERE id = ?', [memberId]);
+      if (!member.length) {
+        return res.status(404).json({ success: false, message: 'Member not found' });
+      }
+      
+      // Tenant Isolation
+      if (req.user.roleId !== 1 && member[0].adminId !== tenantId) {
+        return res.status(403).json({ success: false, message: 'Unauthorized to send message to this member' });
+      }
+      
+      if (!member[0].userId) {
+        return res.status(400).json({ success: false, message: 'Member has no associated user account' });
+      }
+      
+      // Override 'to' with the correct userId
+      req.body.to = member[0].userId.toString();
+    }
+
+    const log = await sendNotificationService({
+      ...req.body,
+      tenantId,
+      senderId: req.user?.id,
+    });
     res.json({ success: true, log });
   } catch (err) {
     next(err);
