@@ -3,7 +3,7 @@ import { pool } from "../../config/db.js";
 import { uploadToCloudinary } from "../../config/cloudinary.js";
 import bcrypt from "bcryptjs";
 import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
-import Razorpay from "Razorpay";
+import Razorpay from "razorpay";
 import crypto from "crypto";
 
 export const createRazorpayOrder = async (req, res) => {
