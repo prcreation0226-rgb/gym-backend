@@ -245,7 +245,7 @@ export const memberCheckIn = async (req, res, next) => {
       await sendTemplatedNotification({
         eventKey: 'MEMBER_ATTENDANCE',
         tenantId: memberAdminId || member.adminId || null,
-        receiverId: member.id,
+        receiverId: member.userId,
         receiverRole: 'Member',
         receiverEmail: member.email,
         receiverPhone: member.phone,

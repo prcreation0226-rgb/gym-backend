@@ -186,7 +186,11 @@ async function runStartupMigrations() {
     await pool.query(`
       UPDATE message_templates
       SET channel = 'EMAIL,IN_APP'
-      WHERE eventKey IN ('PLAN_UPGRADE_REQUEST', 'PLAN_UPGRADED', 'SUBSCRIPTION_ACTIVATED', 'ANNOUNCEMENT', 'PLAN_PURCHASED')
+      WHERE eventKey IN (
+        'PLAN_UPGRADE_REQUEST', 'PLAN_UPGRADED', 'SUBSCRIPTION_ACTIVATED', 'ANNOUNCEMENT', 'PLAN_PURCHASED',
+        'MEMBER_CREATED', 'MEMBER_PLAN_ASSIGNED', 'MEMBER_ATTENDANCE', 'DIET_PLAN_ASSIGNED', 'WORKOUT_PLAN_ASSIGNED',
+        'HEALTH_LOG_ADDED', 'CLASS_BOOKED', 'CLASS_CREATED', 'SESSION_CREATED'
+      )
     `);
 
     // Force-update specific templates to latest content
