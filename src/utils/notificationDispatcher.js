@@ -159,23 +159,27 @@ export const dispatchNotification = async ({
   // ════════════════════════════════════════════
   if (activeChannels.includes("EMAIL") && toEmail) {
     try {
-      const smtpHost = adminCreds?.smtpHost || process.env.SMTP_HOST;
-      const smtpPort = adminCreds?.smtpPort || Number(process.env.SMTP_PORT) || 587;
-      const smtpUser = adminCreds?.smtpUser || process.env.SMTP_USER;
-      const smtpPass = adminCreds?.smtpPass || process.env.SMTP_PASS;
+      const clean = (val) => (val || "").toString().replace(/['"]/g, '').trim();
+      
+      const smtpHost = adminCreds?.smtpHost || clean(process.env.SMTP_HOST);
+      const rawPort = adminCreds?.smtpPort || clean(process.env.SMTP_PORT);
+      const smtpPort = Number(rawPort) || 587;
+      const smtpUser = adminCreds?.smtpUser || clean(process.env.SMTP_USER);
+      const smtpPass = adminCreds?.smtpPass || clean(process.env.SMTP_PASS);
 
       const transporter = nodemailer.createTransport({
         host: smtpHost,
         port: smtpPort,
-        secure: false, // STARTTLS on port 587
+        secure: false, // STARTTLS on port 587/2525
         auth: { user: smtpUser, pass: smtpPass },
         tls: { rejectUnauthorized: false },
         logger: false,
         debug: false,
       });
 
-      const mailFrom = process.env.MAIL_FROM 
-        ? process.env.MAIL_FROM 
+      const envMailFrom = clean(process.env.MAIL_FROM);
+      const mailFrom = envMailFrom 
+        ? envMailFrom 
         : (adminCreds?.email ? `GymSoft <${adminCreds.email}>` : "GymSoft <noreply@gymsoftware.space>");
 
       await transporter.sendMail({
