@@ -1,6 +1,7 @@
 import { pool } from "../../config/db.js";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
 import { sendAppNotification } from "../../utils/notificationHelper.js";
+import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
 
 
 // ----- CREATE WORKOUT PLAN -----
@@ -64,30 +65,27 @@ export const assignWorkoutPlanService = async (memberId, workoutPlanId) => {
   // Fetch member & notify
   try {
     const [memberRows] = await pool.query(
-      "SELECT m.id, m.fullName, m.email, m.phone, m.userId FROM member m WHERE m.id = ?",
+      "SELECT m.id, m.fullName, m.email, m.phone, m.userId, m.adminId FROM member m WHERE m.id = ?",
       [memberId]
     );
     const member = memberRows[0];
     const planTitle = assignedPlan[0]?.title || "Workout Plan";
 
     if (member && member.userId) {
-      const messageText = `Hi ${member.fullName},\n\nA new workout plan "${planTitle}" has been assigned to you.`;
-      
-      dispatchNotification({
-        category: "templates",
-        toEmail: member.email,
-        toPhone: member.phone,
-        toUserId: member.userId,
-        memberId: member.id,
-        subject: "New Workout Plan Assigned",
-        message: messageText,
-      }).catch(err => console.error("Failed to dispatch workout assignment notification:", err.message));
-
-      sendAppNotification(member.userId, `A new workout plan "${planTitle}" has been assigned to you.`, {
-        title: "Workout Plan Assigned",
-        reference_type: "WORKOUT_PLAN",
-        reference_id: workoutPlanId
-      }).catch(err => console.error("Failed to send app notification for workout assignment:", err));
+      await sendTemplatedNotification({
+        eventKey: 'WORKOUT_PLAN_ASSIGNED',
+        tenantId: member.adminId || null,
+        receiverId: member.id,
+        receiverRole: 'Member',
+        receiverEmail: member.email,
+        receiverPhone: member.phone,
+        variables: {
+          Name: member.fullName,
+        },
+        referenceType: 'WORKOUT_PLAN',
+        referenceId: workoutPlanId.toString(),
+        actionUrl: '/member-dashboard/workout'
+      });
     }
   } catch (err) {
     console.error("Error dispatching workout notification:", err.message);

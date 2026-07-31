@@ -247,7 +247,7 @@ export const registerUser = async (data,payload) => {
 
 
 // ✅ service
-export const loginUser = async ({ email, password }) => {
+export const loginUser = async ({ email, password, bypassPassword = false }) => {
   /* ===============================
      1️⃣ GET USER + ROLE + BRANCH
   =============================== */
@@ -289,7 +289,7 @@ export const loginUser = async ({ email, password }) => {
   // Since emails can be duplicated across tenants, we must find the first one that matches the password.
   // We order by id DESC to prefer the most recently created account if passwords collide.
   for (const row of rows) {
-    const match = await bcrypt.compare(password, row.password);
+    const match = bypassPassword || await bcrypt.compare(password, row.password);
     if (match) {
       const normStatus = (row.status || '').toLowerCase().trim();
       if (normStatus === 'inactive') {
@@ -805,7 +805,7 @@ export const fetchDashboardStats = async () => {
 /**************************************
  * LOGIN MEMBER (NO BCRYPT)
  **************************************/
-export const loginMemberService = async ({ email, password }) => {
+export const loginMemberService = async ({ email, password, bypassPassword = false }) => {
   const sql = `
     SELECT m.*, b.name AS branchName
     FROM member m
@@ -822,7 +822,7 @@ export const loginMemberService = async ({ email, password }) => {
     throw { status: 403, message: "Account disabled" };
   }
 
-  if (member.password !== password) {
+  if (!bypassPassword && member.password !== password) {
     throw { status: 400, message: "Invalid email or password" };
   }
 
@@ -1348,14 +1348,14 @@ const getAccountByEmail = async (email) => {
   // Check user table
   const [users] = await pool.query("SELECT id, email, fullName, companyName, roleId, adminId FROM user WHERE email = ?", [email]);
   // Check member table
-  const [members] = await pool.query("SELECT id, email, name, adminId FROM member WHERE email = ?", [email]);
+  const [members] = await pool.query("SELECT id, email, fullName, adminId FROM member WHERE email = ?", [email]);
 
   if (users.length > 0 && members.length > 0) {
     throw new Error("Multiple accounts found with this email. Please contact support.");
   }
 
   if (users.length > 0) return { type: 'USER', data: users[0], id: users[0].id, name: users[0].fullName || users[0].companyName || 'User' };
-  if (members.length > 0) return { type: 'MEMBER', data: members[0], id: members[0].id, name: members[0].name || 'Member' };
+  if (members.length > 0) return { type: 'MEMBER', data: members[0], id: members[0].id, name: members[0].fullName || 'Member' };
 
   return null;
 };
@@ -1482,6 +1482,45 @@ export const resendOtpService = async (email, ip, userAgent) => {
   await pool.query("UPDATE password_reset_otp SET isUsed = TRUE WHERE email = ? AND isUsed = FALSE", [email]);
 
   return await forgotPasswordService(email, ip, userAgent);
+};
+
+export const loginWithResetTokenService = async (email, resetToken, ip, userAgent) => {
+  const [otps] = await pool.query(
+    "SELECT * FROM password_reset_otp WHERE email = ? AND isVerified = TRUE AND isUsed = FALSE ORDER BY id DESC LIMIT 1",
+    [email]
+  );
+
+  if (otps.length === 0) {
+    return { success: false, message: "Invalid or expired reset token." };
+  }
+
+  const record = otps[0];
+  if (!record.resetToken || new Date() > new Date(record.tokenExpiresAt)) {
+    return { success: false, message: "Reset token has expired. Please request a new OTP." };
+  }
+
+  const isValidToken = await bcrypt.compare(resetToken, record.resetToken);
+  if (!isValidToken) {
+    return { success: false, message: "Invalid reset token." };
+  }
+
+  const account = await getAccountByEmail(email);
+  if (!account) {
+    return { success: false, message: "Account not found." };
+  }
+
+  // Mark token as used since they are logging in
+  await pool.query("UPDATE password_reset_otp SET isUsed = TRUE WHERE id = ?", [record.id]);
+  await logAuthAudit(email, 'LOGIN_WITH_OTP', ip, userAgent, { success: true });
+
+  // Generate token and user payload
+  if (account.type === 'USER') {
+    const data = await loginUser({ email, password: '', bypassPassword: true });
+    return { success: true, ...data };
+  } else {
+    const data = await loginMemberService({ email, password: '', bypassPassword: true });
+    return { success: true, ...data };
+  }
 };
 
 export const resetPasswordService = async (email, resetToken, newPassword, confirmPassword) => {

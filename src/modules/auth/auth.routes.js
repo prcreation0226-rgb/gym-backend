@@ -13,7 +13,8 @@ import {
   forgotPassword,
   verifyForgotPasswordOtp,
   resendForgotPasswordOtp,
-  resetPassword
+  resetPassword,
+  loginWithResetToken
 } from "./auth.controller.js";
 import { verifyToken } from "../../middlewares/auth.js";
 
@@ -28,6 +29,7 @@ router.post("/logout", (req, res) => res.json({ success: true, message: "Logged 
 router.post("/forgot-password", forgotPassword);
 router.post("/verify-forgot-password-otp", verifyForgotPasswordOtp);
 router.post("/resend-forgot-password-otp", resendForgotPasswordOtp);
+router.post("/login-with-reset-token", loginWithResetToken);
 router.post("/reset-password", resetPassword);
 
 router.get("/user/:id", verifyToken(), getUserById);

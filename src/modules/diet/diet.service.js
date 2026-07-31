@@ -1,6 +1,7 @@
 import { pool } from "../../config/db.js";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
 import { sendAppNotification } from "../../utils/notificationHelper.js";
+import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
 
 // ----- CREATE DIET PLAN -----
 export const createDietPlanService = async ({ title, notes, branchId, createdBy, meals, dietType }) => {
@@ -112,7 +113,7 @@ export const assignDietPlanService = async (memberId, dietPlanId) => {
   // Fetch member & diet plan details to dispatch notifications
   try {
     const [memberRows] = await pool.query(
-      "SELECT m.id, m.fullName, m.email, m.phone, m.userId FROM member m WHERE m.id = ?",
+      "SELECT m.id, m.fullName, m.email, m.phone, m.userId, m.adminId FROM member m WHERE m.id = ?",
       [memberId]
     );
     const member = memberRows[0];
@@ -124,25 +125,20 @@ export const assignDietPlanService = async (memberId, dietPlanId) => {
     const planTitle = planRows[0]?.title || "Diet Plan";
 
     if (member) {
-      const messageText = `Hi ${member.fullName},\n\nA new diet plan "${planTitle}" has been assigned to you. Please check your dashboard to view the details.\n\nRegards,\nGym Management`;
-      
-      dispatchNotification({
-        category: "templates",
-        toEmail: member.email,
-        toPhone: member.phone,
-        toUserId: member.userId,
-        memberId: member.id,
-        subject: "New Diet Plan Assigned",
-        message: messageText,
-      }).catch((err) =>
-        console.error("Failed to dispatch diet plan assignment notification:", err.message)
-      );
-
-      sendAppNotification(member.userId, `A new diet plan "${planTitle}" has been assigned to you.`, {
-        title: "Diet Plan Assigned",
-        reference_type: "DIET_PLAN",
-        reference_id: dietPlanId
-      }).catch(err => console.error("Failed to send app notification for diet assignment:", err));
+      await sendTemplatedNotification({
+        eventKey: 'DIET_PLAN_ASSIGNED',
+        tenantId: member.adminId || null,
+        receiverId: member.id,
+        receiverRole: 'Member',
+        receiverEmail: member.email,
+        receiverPhone: member.phone,
+        variables: {
+          Name: member.fullName,
+        },
+        referenceType: 'DIET_PLAN',
+        referenceId: dietPlanId.toString(),
+        actionUrl: '/member-dashboard/diet'
+      });
     }
   } catch (err) {
     console.error("Error fetching notification details for diet assignment:", err.message);

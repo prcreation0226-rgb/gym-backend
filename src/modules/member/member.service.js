@@ -247,17 +247,42 @@ export const createMemberService = async (data) => {
 
   // 4️⃣ Strict Notification Requirement: "Welcome to the Gym"
   try {
-    await createAppNotification({
+    await sendTemplatedNotification({
+      eventKey: 'MEMBER_CREATED',
       tenantId: Number(adminId || userId),
       receiverId: userId,
       receiverRole: 'Member',
-      type: 'Welcome',
-      title: 'Welcome to the Gym 🎉',
-      message: 'Welcome to our fitness family. Your account has been created successfully. We wish you a healthy and successful fitness journey.',
+      receiverEmail: memberEmail,
+      receiverPhone: phone,
+      variables: {
+        Name: fullName,
+      },
       referenceType: 'MEMBER',
       referenceId: memberId.toString(),
       actionUrl: '/member-dashboard'
     });
+    
+    // Also notify Admin
+    if (adminId) {
+      const [adminRows] = await pool.query("SELECT email, phone FROM user WHERE id = ?", [adminId]);
+      if (adminRows.length > 0) {
+        const ad = adminRows[0];
+        await sendTemplatedNotification({
+          eventKey: 'MEMBER_ADDED',
+          tenantId: adminId,
+          receiverId: adminId,
+          receiverRole: 'Admin',
+          receiverEmail: ad.email,
+          receiverPhone: ad.phone,
+          variables: {
+            Name: fullName
+          },
+          referenceType: 'MEMBER',
+          referenceId: memberId.toString(),
+          actionUrl: '/dashboard/memberlist'
+        });
+      }
+    }
   } catch (err) {
     console.error("Failed to insert Welcome notification:", err.message);
   }
@@ -272,13 +297,17 @@ export const createMemberService = async (data) => {
     const durationDays = Math.round((p.membershipTo - p.membershipFrom) / (1000 * 60 * 60 * 24));
     
     try {
-      await createAppNotification({
+      await sendTemplatedNotification({
+        eventKey: 'MEMBER_PLAN_ASSIGNED',
         tenantId: Number(adminId || userId),
         receiverId: userId,
         receiverRole: 'Member',
-        type: 'Membership',
-        title: 'Membership Activated',
-        message: `Your membership plan has been activated successfully.\n\nPlan Name: ${p.planName}\nPlan Duration: ${durationDays} days\nStart Date: ${startDateFormatted}\nExpiry Date: ${expiryDateFormatted}`,
+        receiverEmail: memberEmail,
+        receiverPhone: phone,
+        variables: {
+          Name: fullName,
+          PlanName: p.planName
+        },
         referenceType: 'MEMBERSHIP',
         referenceId: memberId.toString(),
         actionUrl: '/member-dashboard/my-plan'

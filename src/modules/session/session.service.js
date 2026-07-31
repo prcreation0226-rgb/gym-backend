@@ -2,6 +2,7 @@ import { pool } from "../../config/db.js";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
 import { getIO, emitToUser } from "../../config/socket.js";
 import { sendAppNotification } from "../../utils/notificationHelper.js";
+import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
 
 // ➤ Create Session
 // export const createSessionService = async (data) => {
@@ -356,56 +357,66 @@ export const joinSessionService = async (memberId, sessionId) => {
       if (mRows.length > 0) {
         const member = mRows[0];
         const sessDate = session.date ? new Date(session.date).toLocaleDateString() : '';
-        const msg = `Hi ${member.fullName},\n\nYour booking for session "${session.sessionName}" on ${sessDate} at ${session.time} has been confirmed. See you there!`;
-        dispatchNotification({
-          category: "templates",
-          toEmail: member.email,
-          toPhone: member.phone,
-          memberId: member.id,
-          subject: "Session Booking Confirmed",
-          message: msg
-        }).catch(err => console.error("Session notification err:", err));
-
-        /* 6️⃣ INSERT IN-APP NOTIFICATION ALERT & SOCKETS */
         try {
           const io = getIO();
           const memberUserId = member.userId;
           const sessionName = session.sessionName;
 
           // Member
-          const memMsg = `Your booking has been confirmed for ${sessionName}`;
           if (memberUserId) {
-            await sendAppNotification(memberUserId, memMsg, {
-              title: "Session Booking Confirmed",
-              receiver_role: "Member",
-              sender_id: session.adminId,
-              sender_role: "System",
-              reference_type: "SESSION",
-              reference_id: sessionId
+            await sendTemplatedNotification({
+              eventKey: 'CLASS_BOOKED',
+              tenantId: session.adminId || null,
+              receiverId: memberUserId,
+              receiverRole: 'Member',
+              receiverEmail: member.email,
+              receiverPhone: member.phone,
+              variables: {
+                Name: member.fullName,
+                ClassName: sessionName,
+                Date: sessDate + ' at ' + session.time
+              },
+              referenceType: 'SESSION',
+              referenceId: sessionId.toString(),
+              actionUrl: '/member-dashboard'
             });
           }
 
           // Trainer
-          const trainerMsg = `New booking received for ${sessionName} by ${member.fullName || 'A member'}`;
-          await sendAppNotification(session.trainerId, trainerMsg, {
-            title: "New Session Booking",
-            receiver_role: "Trainer",
-            sender_id: memberUserId,
-            sender_role: "Member",
-            reference_type: "SESSION",
-            reference_id: sessionId
+          await sendTemplatedNotification({
+            eventKey: 'CLASS_BOOKED',
+            tenantId: session.adminId || null,
+            receiverId: session.trainerId,
+            receiverRole: 'Trainer',
+            receiverEmail: null,
+            receiverPhone: null,
+            variables: {
+              Name: 'Trainer',
+              ClassName: sessionName,
+              Date: sessDate + ' at ' + session.time
+            },
+            referenceType: 'SESSION',
+            referenceId: sessionId.toString(),
+            actionUrl: '/trainer-dashboard'
           });
 
           // Admin
-          const adminMsg = `New booking received for ${sessionName} by ${member.fullName || 'A member'}`;
           if (session.adminId) {
-            await sendAppNotification(session.adminId, adminMsg, {
-              title: "New Session Booking",
-              receiver_role: "Admin",
-              sender_id: memberUserId,
-              sender_role: "Member",
-              reference_type: "SESSION",
-              reference_id: sessionId
+            await sendTemplatedNotification({
+              eventKey: 'CLASS_BOOKED',
+              tenantId: session.adminId,
+              receiverId: session.adminId,
+              receiverRole: 'Admin',
+              receiverEmail: null,
+              receiverPhone: null,
+              variables: {
+                Name: 'Admin',
+                ClassName: sessionName,
+                Date: sessDate + ' at ' + session.time
+              },
+              referenceType: 'SESSION',
+              referenceId: sessionId.toString(),
+              actionUrl: '/dashboard/classes'
             });
           }
 

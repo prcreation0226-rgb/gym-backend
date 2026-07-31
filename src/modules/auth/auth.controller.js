@@ -2,7 +2,7 @@ import { uploadToCloudinary } from "../../config/cloudinary.js";
 import { registerUser, loginUser , fetchUserById,
   modifyUser,
   removeUser, fetchAdmins, fetchDashboardStats, loginMemberService,changeUserPassword, getAdminDashboardData,
-  forgotPasswordService, verifyOtpService, resendOtpService, resetPasswordService
+  forgotPasswordService, verifyOtpService, resendOtpService, resetPasswordService, loginWithResetTokenService
 } from "./auth.service.js";
 
 
@@ -239,6 +239,16 @@ export const resendForgotPasswordOtp = async (req, res, next) => {
   try {
     const { email } = req.body;
     const result = await resendOtpService(email, req.ip, req.headers['user-agent']);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const loginWithResetToken = async (req, res, next) => {
+  try {
+    const { email, resetToken } = req.body;
+    const result = await loginWithResetTokenService(email, resetToken, req.ip, req.headers['user-agent']);
     res.json(result);
   } catch (err) {
     next(err);

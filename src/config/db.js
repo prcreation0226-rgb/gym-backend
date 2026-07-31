@@ -165,6 +165,14 @@ async function runStartupMigrations() {
       { key: 'SESSION_CANCELLED', name: 'Session Cancelled', subject: 'Session Cancelled', message: 'Hi {Name}, the session {SessionName} has been cancelled.', vars: '["Name", "SessionName"]' },
       { key: 'FORGOT_PASSWORD_OTP', name: 'Forgot Password OTP', subject: 'Password Reset OTP', message: 'Hi {Name},\\n\\nYour OTP is\\n{OTP}\\n\\nIt will expire in\\n10 Minutes.\\n\\nIf you did not request this,\\nplease ignore this email.', vars: '["Name", "OTP", "CompanyName"]' },
       { key: 'PASSWORD_CHANGED', name: 'Password Changed', subject: 'Password Changed Successfully', message: 'Your account password has been changed successfully.\\n\\nIf this was not you, please contact your administrator immediately.', vars: '[]' },
+      { key: 'NEW_ADMIN_REQUEST', name: 'New Admin Request', subject: 'New SaaS Plan Request', message: 'Hi Superadmin, {AdminName} has requested or purchased the {PlanName} plan.', vars: '["AdminName", "PlanName"]' },
+      { key: 'ADMIN_REQUEST_APPROVED', name: 'Admin Request Approved', subject: 'SaaS Plan Approved', message: 'Hi {Name}, your request for the {PlanName} plan has been approved and activated.', vars: '["Name", "PlanName"]' },
+      { key: 'MEMBER_ADDED', name: 'Member Added Alert', subject: 'New Member Added', message: 'Hi Admin, a new member {Name} has been added to your gym.', vars: '["Name"]' },
+      { key: 'MEMBER_ATTENDANCE', name: 'Member Attendance', subject: 'Attendance Marked', message: 'Hi {Name}, your attendance for {Date} has been marked as {Status}.', vars: '["Name", "Date", "Status"]' },
+      { key: 'DIET_PLAN_ASSIGNED', name: 'Diet Plan Assigned', subject: 'New Diet Plan', message: 'Hi {Name}, a new diet plan has been assigned to you. Please check your dashboard.', vars: '["Name"]' },
+      { key: 'WORKOUT_PLAN_ASSIGNED', name: 'Workout Plan Assigned', subject: 'New Workout Plan', message: 'Hi {Name}, a new workout plan has been assigned to you. Please check your dashboard.', vars: '["Name"]' },
+      { key: 'HEALTH_LOG_ADDED', name: 'Health Log Added', subject: 'Health Log Updated', message: 'Hi {Name}, a new health log entry has been added to your profile.', vars: '["Name"]' },
+      { key: 'CLASS_BOOKED', name: 'Class Booked', subject: 'Class Booking Confirmed', message: 'Hi {Name}, your booking for the class {ClassName} is confirmed for {Date}.', vars: '["Name", "ClassName", "Date"]' }
     ];
 
     for (const t of defaultTemplates) {
@@ -182,7 +190,11 @@ async function runStartupMigrations() {
     `);
 
     // Force-update specific templates to latest content
-    const templatesToForceUpdate = ['PLAN_UPGRADE_REQUEST', 'PLAN_PURCHASED', 'PLAN_UPGRADED', 'SUBSCRIPTION_ACTIVATED'];
+    const templatesToForceUpdate = [
+      'PLAN_UPGRADE_REQUEST', 'PLAN_PURCHASED', 'PLAN_UPGRADED', 'SUBSCRIPTION_ACTIVATED',
+      'NEW_ADMIN_REQUEST', 'ADMIN_REQUEST_APPROVED', 'MEMBER_ADDED', 'MEMBER_ATTENDANCE',
+      'DIET_PLAN_ASSIGNED', 'WORKOUT_PLAN_ASSIGNED', 'HEALTH_LOG_ADDED', 'CLASS_BOOKED'
+    ];
     for (const eventKey of templatesToForceUpdate) {
       const tmpl = defaultTemplates.find(t => t.key === eventKey);
       if (tmpl) {

@@ -145,7 +145,7 @@ export const dispatchNotification = async ({
   let adminCreds = null;
   if (adminId) {
     const [rows] = await pool.query(
-      "SELECT smtpHost, smtpPort, smtpUser, smtpPass, whatsappAccessToken, whatsappPhoneNumberId, whatsappCredits FROM user WHERE id = ?",
+      "SELECT email, smtpHost, smtpPort, smtpUser, smtpPass, whatsappAccessToken, whatsappPhoneNumberId, whatsappCredits FROM user WHERE id = ?",
       [adminId]
     );
     if (rows.length > 0) adminCreds = rows[0];
@@ -171,8 +171,12 @@ export const dispatchNotification = async ({
         debug: false,
       });
 
+      const mailFrom = process.env.MAIL_FROM 
+        ? process.env.MAIL_FROM 
+        : (adminCreds?.email ? `GymSoft <${adminCreds.email}>` : "GymSoft <noreply@gymsoftware.space>");
+
       await transporter.sendMail({
-        from: process.env.MAIL_FROM || "GymSoft <noreply@gymsoftware.space>",
+        from: mailFrom,
         to: toEmail,
         subject,
         text: message,

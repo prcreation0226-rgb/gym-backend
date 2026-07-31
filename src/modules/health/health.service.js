@@ -49,12 +49,29 @@ export const addHealthLogService = async (data) => {
     [memberId, trainerId || null, weight || null, height || null, bmi, bmiStatus, notes || null, dietChart || null]
   );
 
-  // Trigger WhatsApp notification if diet chart is provided
-  if (dietChart) {
-    const [[member]] = await pool.query("SELECT fullName, phone FROM member WHERE id = ?", [memberId]);
-    if (member && member.phone) {
-      const msg = `Hi ${member.fullName}, \n\nYour new diet chart has been updated by your trainer. \n\nLog in to your gym app to view your personalized diet plan! 🍎🥦\n\nRegards,\nGym Management`;
-      sendWhatsAppMessage(member.phone, msg).catch(console.error);
+  // Fetch member info
+  const [[member]] = await pool.query("SELECT fullName, email, phone, adminId FROM member WHERE id = ?", [memberId]);
+  
+  if (member) {
+    // Send standard notification
+    try {
+      const { sendTemplatedNotification } = await import("../messageTemplates/messageTemplate.service.js");
+      await sendTemplatedNotification({
+        eventKey: 'HEALTH_LOG_ADDED',
+        tenantId: member.adminId || null,
+        receiverId: memberId,
+        receiverRole: 'Member',
+        receiverEmail: member.email,
+        receiverPhone: member.phone,
+        variables: {
+          Name: member.fullName,
+        },
+        referenceType: 'HEALTH_LOG',
+        referenceId: result.insertId.toString(),
+        actionUrl: '/member-dashboard/health'
+      });
+    } catch (err) {
+      console.error("Failed to send health log notification:", err.message);
     }
   }
 

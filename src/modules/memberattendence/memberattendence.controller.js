@@ -2,6 +2,7 @@ import { pool } from "../../config/db.js";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
 import { emitToUser } from "../../config/socket.js";
 import { notifyAdminAndStaff } from "../../utils/notificationHelper.js";
+import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
 
 /* -----------------------------------------------------
    1️⃣  MEMBER/ADMIN CHECK-IN  (Manual + QR + Manual Times)
@@ -241,14 +242,22 @@ export const memberCheckIn = async (req, res, next) => {
       const checkInDate = finalCheckIn.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
       const message = `Hi ${member.fullName},\n\nYour attendance has been successfully marked for today (${checkInDate}) at ${checkInTime}.\n\nHave a great workout!`;
 
-      dispatchNotification({
-        category: "templates",
-        toEmail: member.email,
-        toPhone: member.phone,
-        memberId: member.id,
-        subject: "Attendance Marked",
-        message: message
-      }).catch(err => console.error("Failed to send attendance notification:", err));
+      await sendTemplatedNotification({
+        eventKey: 'MEMBER_ATTENDANCE',
+        tenantId: memberAdminId || member.adminId || null,
+        receiverId: member.id,
+        receiverRole: 'Member',
+        receiverEmail: member.email,
+        receiverPhone: member.phone,
+        variables: {
+          Name: member.fullName,
+          Date: checkInDate,
+          Status: 'Checked In'
+        },
+        referenceType: 'ATTENDANCE',
+        referenceId: memberId.toString(),
+        actionUrl: '/member-dashboard'
+      });
     }
 
     // Emit socket event to admin
