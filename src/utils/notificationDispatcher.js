@@ -193,8 +193,8 @@ export const dispatchNotification = async ({
       console.error(`❌ Email failed for ${toEmail}:`, err.message);
       results.email = { success: false, error: err.message };
       await pool.query(
-        "INSERT INTO notificationlog (type, `to`, message, memberId, status) VALUES (?, ?, ?, ?, ?)",
-        ["EMAIL", toEmail, message, memberId || null, "FAILED"]
+        "INSERT INTO notificationlog (type, `to`, message, memberId, status, error) VALUES (?, ?, ?, ?, ?, ?)",
+        ["EMAIL", toEmail, message, memberId || null, "FAILED", err.message]
       ).catch(() => {});
     }
   }
