@@ -1346,7 +1346,7 @@ const logAuthAudit = async (email, event, ipAddress, userAgent, details) => {
 
 const getAccountByEmail = async (email) => {
   // Check user table
-  const [users] = await pool.query("SELECT id, email, fullName, companyName, roleId, adminId FROM user WHERE email = ?", [email]);
+  const [users] = await pool.query("SELECT id, email, fullName, gymName, roleId, adminId FROM user WHERE email = ?", [email]);
   // Check member table
   const [members] = await pool.query("SELECT id, email, fullName, adminId FROM member WHERE email = ?", [email]);
 
@@ -1354,7 +1354,7 @@ const getAccountByEmail = async (email) => {
     throw new Error("Multiple accounts found with this email. Please contact support.");
   }
 
-  if (users.length > 0) return { type: 'USER', data: users[0], id: users[0].id, name: users[0].fullName || users[0].companyName || 'User' };
+  if (users.length > 0) return { type: 'USER', data: users[0], id: users[0].id, name: users[0].fullName || users[0].gymName || 'User' };
   if (members.length > 0) return { type: 'MEMBER', data: members[0], id: members[0].id, name: members[0].fullName || 'Member' };
 
   return null;
