@@ -9,15 +9,10 @@ const getIdentity = async (req) => {
   let receiverId = req.user.id;
   let receiverRole = req.user.role || (req.user.roleId === 1 ? 'Super Admin' : (req.user.roleId === 2 ? 'Admin' : (req.user.roleId === 4 ? 'Member' : 'Staff')));
 
-  // If member, token might only have member.id (not userId) and lack adminId
+  // If member, tenantId is their adminId. receiverId is their userId.
   if (receiverRole.toUpperCase() === 'MEMBER') {
-    const [memberRows] = await pool.query("SELECT adminId, userId FROM member WHERE id = ?", [req.user.id]);
-    if (memberRows.length > 0) {
-      tenantId = memberRows[0].adminId;
-      if (memberRows[0].userId) {
-        receiverId = memberRows[0].userId;
-      }
-    }
+    tenantId = req.user.adminId;
+    receiverId = req.user.id; // userId from user table
   }
 
   return { tenantId, receiverId, receiverRole };
