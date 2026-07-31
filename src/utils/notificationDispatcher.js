@@ -143,6 +143,8 @@ export const dispatchNotification = async ({
 
   // ── Load admin's custom SMTP + WhatsApp credentials (if set) ──
   let adminCreds = null;
+  // TEMPORARILY DISABLED to force use of .env
+  /*
   if (adminId) {
     const [rows] = await pool.query(
       "SELECT email, smtpHost, smtpPort, smtpUser, smtpPass, whatsappAccessToken, whatsappPhoneNumberId, whatsappCredits FROM user WHERE id = ?",
@@ -150,6 +152,7 @@ export const dispatchNotification = async ({
     );
     if (rows.length > 0) adminCreds = rows[0];
   }
+  */
 
   // ════════════════════════════════════════════
   // 1.  EMAIL  →  SendGrid (or admin custom SMTP)
