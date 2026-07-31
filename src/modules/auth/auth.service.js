@@ -1332,7 +1332,6 @@ const recentActivitiesQuery = `
 
 
 // --- FORGOT PASSWORD FLOW ---
-
 const logAuthAudit = async (email, event, ipAddress, userAgent, details) => {
   try {
     await pool.query(
@@ -1344,18 +1343,38 @@ const logAuthAudit = async (email, event, ipAddress, userAgent, details) => {
   }
 };
 
-const getAccountByEmail = async (email) => {
-  // Check user table
-  const [users] = await pool.query("SELECT id, email, fullName, gymName, roleId, adminId FROM user WHERE email = ?", [email]);
-  // Check member table
-  const [members] = await pool.query("SELECT id, email, fullName, adminId FROM member WHERE email = ?", [email]);
+export const getAccountByEmail = async (email) => {
+  const [users] = await pool.query("SELECT * FROM user WHERE email = ?", [email]);
+  const [members] = await pool.query("SELECT * FROM member WHERE email = ?", [email]);
 
-  if (users.length > 0 && members.length > 0) {
-    throw new Error("Multiple accounts found with this email. Please contact support.");
+  // Prioritize User (Admin/Staff) over Member if both exist
+  if (users.length > 0) {
+    if (users.length > 1) {
+      throw new Error("Multiple user accounts found with this email. Please contact support.");
+    }
+    const user = users[0];
+    return {
+      id: user.id,
+      type: "USER",
+      name: user.fullName || user.gymName || 'User',
+      password: user.password,
+      data: user,
+    };
   }
 
-  if (users.length > 0) return { type: 'USER', data: users[0], id: users[0].id, name: users[0].fullName || users[0].gymName || 'User' };
-  if (members.length > 0) return { type: 'MEMBER', data: members[0], id: members[0].id, name: members[0].fullName || 'Member' };
+  if (members.length > 0) {
+    if (members.length > 1) {
+      throw new Error("Multiple member accounts found with this email. Please contact support.");
+    }
+    const member = members[0];
+    return {
+      id: member.id,
+      type: "MEMBER",
+      name: member.fullName || 'Member',
+      password: member.password,
+      data: member,
+    };
+  }
 
   return null;
 };

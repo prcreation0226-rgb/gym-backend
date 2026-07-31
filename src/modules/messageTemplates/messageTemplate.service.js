@@ -93,9 +93,9 @@ export const sendTemplatedNotification = async ({
   receiverEmail,
   receiverPhone,
   variables = {},
-  referenceType,
-  referenceId,
-  actionUrl
+  referenceType = null,
+  referenceId = null,
+  actionUrl = null
 }) => {
   try {
     const templates = await getTemplates();
