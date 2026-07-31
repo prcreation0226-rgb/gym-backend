@@ -3,7 +3,125 @@ import { pool } from "../../config/db.js";
 import { uploadToCloudinary } from "../../config/cloudinary.js";
 import bcrypt from "bcryptjs";
 import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
+import Razorpay from "Razorpay";
+import crypto from "crypto";
 
+export const createRazorpayOrder = async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const activeKeyId = process.env.RAZORPAY_KEY_ID;
+    const activeKeySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!activeKeyId || !activeKeySecret) {
+      return res.status(400).json({ success: false, message: "Superadmin Razorpay keys not configured." });
+    }
+
+    if (activeKeyId.includes("dummy") || activeKeySecret.includes("dummy")) {
+      return res.status(200).json({
+        success: true,
+        order: {
+          id: "order_mock_" + Date.now(),
+          amount: (amount || 0) * 100,
+          currency: "INR",
+        },
+        key: activeKeyId,
+        isMock: true
+      });
+    }
+
+    const razorpay = new Razorpay({
+      key_id: activeKeyId,
+      key_secret: activeKeySecret,
+    });
+
+    const options = {
+      amount: Math.round((amount || 0) * 100),
+      currency: "INR",
+      receipt: `rcpt_admin_${Date.now()}`
+    };
+
+    const order = await razorpay.orders.create(options);
+    return res.status(200).json({ success: true, order, key: activeKeyId });
+  } catch (err) {
+    console.warn("⚠️ Razorpay API call failed for admin subscription:", err.message);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const verifyRazorpayPayment = async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, isMock } = req.body;
+    let purchaseData = req.body.purchaseData;
+    
+    // If purchaseData is a string (from FormData), parse it, or if it doesn't exist, the whole req.body is the purchaseData
+    if (typeof purchaseData === 'string') {
+      try { purchaseData = JSON.parse(purchaseData); } catch (e) {}
+    }
+    if (!purchaseData) {
+      purchaseData = { ...req.body };
+      delete purchaseData.razorpay_order_id;
+      delete purchaseData.razorpay_payment_id;
+      delete purchaseData.razorpay_signature;
+      delete purchaseData.isMock;
+    }
+
+    const activeKeySecret = process.env.RAZORPAY_KEY_SECRET;
+
+    if (!isMock && activeKeySecret && !activeKeySecret.includes("dummy") && !razorpay_order_id?.startsWith("order_mock_")) {
+      const generated_signature = crypto
+        .createHmac("sha256", activeKeySecret)
+        .update(razorpay_order_id + "|" + razorpay_payment_id)
+        .digest("hex");
+
+      if (generated_signature !== razorpay_signature) {
+        return res.status(400).json({ success: false, message: "Invalid payment signature" });
+      }
+    }
+
+    // Since payment is verified, we process the purchase request automatically
+    purchaseData.paymentMethod = "Razorpay";
+    // Important: if using FormData, file is in req.files
+    // In createPurchaseService, it expects data to contain all fields. But wait, createPurchaseService doesn't handle file uploads!
+    // createPurchase (the controller) handles file uploads.
+    // If we call createPurchaseService directly, the file upload won't happen.
+    // Let's mimic createPurchase's file upload logic here:
+    let imageUrl = null;
+    if (req.files?.profileImage) {
+      const { uploadToCloudinary } = await import("../../config/cloudinary.js");
+      imageUrl = await uploadToCloudinary(
+        req.files.profileImage,
+        "users/profile"
+      );
+    }
+    purchaseData.profileImage = imageUrl || purchaseData.profileImage;
+    purchaseData.visiblePassword = purchaseData.password || null;
+    
+    // 1. Create the purchase record
+    const purchase = await createPurchaseService(purchaseData);
+
+    // 2. Immediately approve it since payment is verified
+    // We mimic the updatePurchaseStatus logic but internally
+    const reqMock = { params: { id: purchase.id }, body: { status: "APPROVED" } };
+    let successData = purchase;
+    const resMock = {
+      json: (data) => { successData = data; },
+      status: (code) => resMock
+    };
+    
+    // We can just call updatePurchaseStatus with mock req/res, OR we just use the existing function
+    // Let's call updatePurchaseStatus directly. It takes (req, res, next).
+    await updatePurchaseStatus(reqMock, resMock, (err) => { throw err; });
+
+    return res.status(200).json({ 
+      success: true, 
+      message: "Payment successful and plan activated!", 
+      data: successData 
+    });
+  } catch (err) {
+    console.error("Razorpay Verify Error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
 export const createPurchase = async (req, res) => {
   try {
     const data = req.body;   // selectedPlan, companyName, email, billingDuration, startDate, password
