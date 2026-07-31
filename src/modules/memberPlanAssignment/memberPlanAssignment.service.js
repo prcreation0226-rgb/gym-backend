@@ -26,7 +26,7 @@ export const assignPlansToMember = async (data) => {
 
     // Fetch plan details
     const [[plan]] = await pool.query(
-      "SELECT id, validityDays, price FROM memberplan WHERE id = ?",
+      "SELECT id, name, validityDays, price FROM memberplan WHERE id = ?",
       [planId]
     );
 
@@ -73,7 +73,7 @@ export const assignPlansToMember = async (data) => {
         receiverRole: 'Member',
         type: 'General',
         title: 'Membership Activated',
-        message: `Your membership plan '${plan.name || 'N/A'}' has been successfully assigned. Validity: ${plan.validityDays || 30} days.`,
+        message: `Your membership plan '${plan.name || 'N/A'}' has been successfully assigned. Price: ₹${plan.price || 0}, Validity: ${plan.validityDays || 30} days.`,
         referenceType: 'PLAN_ASSIGNMENT',
         referenceId: result.insertId.toString(),
         actionUrl: '/member-dashboard'
