@@ -75,7 +75,7 @@ export const assignWorkoutPlanService = async (memberId, workoutPlanId) => {
       await sendTemplatedNotification({
         eventKey: 'WORKOUT_PLAN_ASSIGNED',
         tenantId: member.adminId || null,
-        receiverId: member.id,
+        receiverId: member.userId,
         receiverRole: 'Member',
         receiverEmail: member.email,
         receiverPhone: member.phone,

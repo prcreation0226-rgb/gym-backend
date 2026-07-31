@@ -34,11 +34,11 @@ export const createAppNotification = async ({
       throw new Error("Receiver does not exist");
     }
     
-    const expectedTenantId = user.roleId === 1 ? user.id : (user.adminId || user.id);
-    if (tenantId !== expectedTenantId && user.roleId !== 1) { 
+    const expectedTenantId = Number(user.roleId) === 1 ? user.id : (user.adminId || user.id);
+    if (Number(tenantId) !== Number(expectedTenantId) && Number(user.roleId) !== 1) { 
       // Note: If user is SuperAdmin (role=1) receiving from System, tenantId might be System
       // We log but do not strictly block if tenantId mismatch occurs for SuperAdmin.
-      if (user.roleId !== 1) {
+      if (Number(user.roleId) !== 1) {
         throw new Error(`Tenant mismatch. Expected ${expectedTenantId}, got ${tenantId}`);
       }
     }

@@ -124,11 +124,11 @@ export const assignDietPlanService = async (memberId, dietPlanId) => {
     );
     const planTitle = planRows[0]?.title || "Diet Plan";
 
-    if (member) {
+    if (member && member.userId) {
       await sendTemplatedNotification({
         eventKey: 'DIET_PLAN_ASSIGNED',
         tenantId: member.adminId || null,
-        receiverId: member.id,
+        receiverId: member.userId,
         receiverRole: 'Member',
         receiverEmail: member.email,
         receiverPhone: member.phone,
