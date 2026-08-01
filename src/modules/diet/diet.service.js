@@ -119,10 +119,35 @@ export const assignDietPlanService = async (memberId, dietPlanId) => {
     const member = memberRows[0];
 
     const [planRows] = await pool.query(
-      "SELECT title FROM dietplan WHERE id = ?",
+      "SELECT title, createdBy FROM dietplan WHERE id = ?",
       [dietPlanId]
     );
-    const planTitle = planRows[0]?.title || "Diet Plan";
+    const plan = planRows[0];
+    const planTitle = plan?.title || "Diet Plan";
+    const createdBy = plan?.createdBy;
+
+    // Fetch Diet Details
+    const [mealRows] = await pool.query("SELECT time, food FROM dietmeal WHERE dietPlanId = ?", [dietPlanId]);
+    let dietDetails = mealRows.map(m => `- ${m.time}: ${m.food}`).join('\\n');
+    if (!dietDetails) dietDetails = "Check your dashboard for items.";
+
+    // Fetch Gym Name and Trainer Name
+    let gymName = "GymSoft";
+    let trainerName = "Your Trainer";
+
+    if (member && member.adminId) {
+      const [adminRows] = await pool.query("SELECT gymName FROM user WHERE id = ?", [member.adminId]);
+      if (adminRows.length > 0 && adminRows[0].gymName) {
+        gymName = adminRows[0].gymName;
+      }
+    }
+    
+    if (createdBy) {
+      const [creatorRows] = await pool.query("SELECT fullName FROM user WHERE id = ?", [createdBy]);
+      if (creatorRows.length > 0) {
+        trainerName = creatorRows[0].fullName;
+      }
+    }
 
     if (member && member.userId) {
       await sendTemplatedNotification({
@@ -134,6 +159,9 @@ export const assignDietPlanService = async (memberId, dietPlanId) => {
         receiverPhone: member.phone,
         variables: {
           Name: member.fullName,
+          GymName: gymName,
+          DietDetails: dietDetails,
+          TrainerName: trainerName
         },
         referenceType: 'DIET_PLAN',
         referenceId: dietPlanId.toString(),

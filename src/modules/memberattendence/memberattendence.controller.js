@@ -240,11 +240,19 @@ export const memberCheckIn = async (req, res, next) => {
       const member = memberRecords[0];
       const checkInTime = finalCheckIn.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
       const checkInDate = finalCheckIn.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
-      const message = `Hi ${member.fullName},\n\nYour attendance has been successfully marked for today (${checkInDate}) at ${checkInTime}.\n\nHave a great workout!`;
+      
+      let gymName = "GymSoft";
+      const tenantId = memberAdminId || member.adminId || null;
+      if (tenantId) {
+        const [adminRows] = await pool.query("SELECT gymName FROM user WHERE id = ?", [tenantId]);
+        if (adminRows.length > 0 && adminRows[0].gymName) {
+          gymName = adminRows[0].gymName;
+        }
+      }
 
       await sendTemplatedNotification({
         eventKey: 'MEMBER_ATTENDANCE',
-        tenantId: memberAdminId || member.adminId || null,
+        tenantId: tenantId,
         receiverId: member.userId,
         receiverRole: 'Member',
         receiverEmail: member.email,
@@ -252,7 +260,9 @@ export const memberCheckIn = async (req, res, next) => {
         variables: {
           Name: member.fullName,
           Date: checkInDate,
-          Status: 'Checked In'
+          Status: 'Checked In',
+          GymName: gymName,
+          Time: checkInTime
         },
         referenceType: 'ATTENDANCE',
         referenceId: memberId.toString(),

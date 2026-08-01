@@ -245,6 +245,19 @@ export const createMemberService = async (data) => {
 
   console.log(`✅ Total plans assigned: ${assignedPlans.length} out of ${plansToAssign.length} requested`);
 
+  // Fetch admin details to get gymName
+  let gymName = "GymSoft";
+  let adminEmail = null;
+  let adminPhone = null;
+  if (adminId) {
+    const [adminRows] = await pool.query("SELECT email, phone, gymName FROM user WHERE id = ?", [adminId]);
+    if (adminRows.length > 0) {
+      gymName = adminRows[0].gymName || "GymSoft";
+      adminEmail = adminRows[0].email;
+      adminPhone = adminRows[0].phone;
+    }
+  }
+
   // 4️⃣ Strict Notification Requirement: "Welcome to the Gym"
   try {
     await sendTemplatedNotification({
@@ -256,6 +269,9 @@ export const createMemberService = async (data) => {
       receiverPhone: phone,
       variables: {
         Name: fullName,
+        GymName: gymName,
+        Email: memberEmail,
+        Password: userPassword
       },
       referenceType: 'MEMBER',
       referenceId: memberId.toString(),
@@ -263,25 +279,21 @@ export const createMemberService = async (data) => {
     });
     
     // Also notify Admin
-    if (adminId) {
-      const [adminRows] = await pool.query("SELECT email, phone FROM user WHERE id = ?", [adminId]);
-      if (adminRows.length > 0) {
-        const ad = adminRows[0];
-        await sendTemplatedNotification({
-          eventKey: 'MEMBER_ADDED',
-          tenantId: adminId,
-          receiverId: adminId,
-          receiverRole: 'Admin',
-          receiverEmail: ad.email,
-          receiverPhone: ad.phone,
-          variables: {
-            Name: fullName
-          },
-          referenceType: 'MEMBER',
-          referenceId: memberId.toString(),
-          actionUrl: '/dashboard/memberlist'
-        });
-      }
+    if (adminId && adminEmail) {
+      await sendTemplatedNotification({
+        eventKey: 'MEMBER_ADDED',
+        tenantId: adminId,
+        receiverId: adminId,
+        receiverRole: 'Admin',
+        receiverEmail: adminEmail,
+        receiverPhone: adminPhone,
+        variables: {
+          Name: fullName
+        },
+        referenceType: 'MEMBER',
+        referenceId: memberId.toString(),
+        actionUrl: '/members'
+      });
     }
   } catch (err) {
     console.error("Failed to insert Welcome notification:", err.message);
@@ -306,7 +318,10 @@ export const createMemberService = async (data) => {
         receiverPhone: phone,
         variables: {
           Name: fullName,
-          PlanName: p.planName
+          PlanName: p.planName,
+          GymName: gymName,
+          Validity: expiryDateFormatted,
+          DateTime: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })
         },
         referenceType: 'MEMBERSHIP',
         referenceId: memberId.toString(),
