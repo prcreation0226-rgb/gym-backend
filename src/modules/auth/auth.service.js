@@ -1547,9 +1547,9 @@ export const resetPasswordService = async (email, resetToken, newPassword, confi
     return { success: false, message: "Passwords do not match." };
   }
 
-  const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[\\W_]).{8,}$/;
+  const passRegex = /^(?=.*\d)(?=.*[\W_]).{8,}$/;
   if (!passRegex.test(newPassword)) {
-    return { success: false, message: "Password must be at least 8 characters, include uppercase, lowercase, number, and special character." };
+    return { success: false, message: "Password must be at least 8 characters, include a number and a special character." };
   }
 
   const [otps] = await pool.query(
