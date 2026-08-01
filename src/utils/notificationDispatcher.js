@@ -4,7 +4,17 @@ import { pool } from "../config/db.js";
  * Build styled HTML email
  */
 const buildEmailHtml = (subject, message) => {
-  const lines = message.split("\n").map(l => `<p style="margin:6px 0;color:#374151;font-size:15px;">${l}</p>`).join("");
+  // Replace literal '\n' string with actual newlines to support DB stored templates
+  const normalizedMessage = message.replace(/\\n/g, '\n');
+  const lines = normalizedMessage.split("\n").map(l => {
+    const trimmed = l.trim();
+    if (!trimmed) return `<div style="height:12px;"></div>`;
+    // If the line is an OTP (4 to 8 digits)
+    if (/^\d{4,8}$/.test(trimmed)) {
+      return `<div style="background:#eef2ff;border:2px dashed #6366f1;border-radius:12px;padding:16px;text-align:center;font-size:32px;font-weight:800;letter-spacing:12px;color:#4f46e5;margin:24px auto;width:max-content;box-shadow:0 4px 6px rgba(99, 102, 241, 0.1);">${trimmed}</div>`;
+    }
+    return `<p style="margin:8px 0;color:#374151;font-size:16px;line-height:1.6;">${trimmed}</p>`;
+  }).join("");
   return `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"/></head>
