@@ -1,5 +1,4 @@
 import { pool } from "../config/db.js";
-import nodemailer from "nodemailer";
 
 /**
  * Build styled HTML email
@@ -155,40 +154,52 @@ export const dispatchNotification = async ({
   */
 
   // ════════════════════════════════════════════
-  // 1.  EMAIL  →  SendGrid (or admin custom SMTP)
+  // 1.  EMAIL  →  Brevo HTTP API
   // ════════════════════════════════════════════
   if (activeChannels.includes("EMAIL") && toEmail) {
     try {
       const clean = (val) => (val || "").toString().replace(/['"]/g, '').trim();
       
-      const smtpHost = adminCreds?.smtpHost || clean(process.env.SMTP_HOST);
-      const rawPort = adminCreds?.smtpPort || clean(process.env.SMTP_PORT);
-      const smtpPort = Number(rawPort) || 587;
-      const smtpUser = adminCreds?.smtpUser || clean(process.env.SMTP_USER);
-      const smtpPass = adminCreds?.smtpPass || clean(process.env.SMTP_PASS);
-
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: false, // STARTTLS on port 587/2525
-        auth: { user: smtpUser, pass: smtpPass },
-        tls: { rejectUnauthorized: false },
-        logger: false,
-        debug: false,
-      });
+      const brevoApiKey = clean(process.env.BREVO_API_KEY);
+      if (!brevoApiKey) {
+        throw new Error("BREVO_API_KEY is not configured.");
+      }
 
       const envMailFrom = clean(process.env.MAIL_FROM);
       const mailFrom = envMailFrom 
         ? envMailFrom 
         : (adminCreds?.email ? `GymSoft <${adminCreds.email}>` : "GymSoft <noreply@gymsoftware.space>");
 
-      await transporter.sendMail({
-        from: mailFrom,
-        to: toEmail,
-        subject,
-        text: message,
-        html: buildEmailHtml(subject, message),
+      let senderName = "GymSoft";
+      let senderEmail = "noreply@gymsoftware.space";
+      const match = mailFrom.match(/(.*)<(.*)>/);
+      if (match) {
+          senderName = match[1].trim();
+          senderEmail = match[2].trim();
+      } else {
+          senderEmail = mailFrom.trim();
+      }
+
+      const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": brevoApiKey,
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({
+          sender: { name: senderName, email: senderEmail },
+          to: [{ email: toEmail }],
+          subject: subject,
+          htmlContent: buildEmailHtml(subject, message),
+          textContent: message
+        })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Brevo API Error: ${JSON.stringify(errorData)}`);
+      }
 
       await pool.query(
         "INSERT INTO notificationlog (type, `to`, message, memberId, status) VALUES (?, ?, ?, ?, ?)",

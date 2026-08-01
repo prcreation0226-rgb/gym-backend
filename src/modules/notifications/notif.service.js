@@ -1,5 +1,4 @@
 import { pool } from "../../config/db.js"; // make sure it's a mysql2/promise pool
-import nodemailer from "nodemailer";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
 import { createAppNotification } from "../appNotifications/appNotification.service.js";
 import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
@@ -124,38 +123,49 @@ export const sendNotificationService = async ({ type, to, message, memberId, sub
         return { success: false, reason: "Invalid email address: " + to };
       }
 
-      // Guard: if SMTP is not configured, skip gracefully instead of crashing
-      const smtpHost = process.env.SMTP_HOST;
-      const smtpUser = process.env.SMTP_USER;
-      const smtpPass = process.env.SMTP_PASS;
+      // Guard: if API Key is not configured, skip gracefully
+      const brevoApiKey = process.env.BREVO_API_KEY;
 
-      if (!smtpHost || !smtpUser || !smtpPass) {
+      if (!brevoApiKey) {
         await pool.query(
           `UPDATE notificationlog SET status = 'SKIPPED', error = ? WHERE id = ?`,
-          ['SMTP not configured on server (SMTP_HOST/SMTP_USER/SMTP_PASS missing)', logId]
+          ['Brevo API not configured on server (BREVO_API_KEY missing)', logId]
         );
-        console.warn(`⚠️  EMAIL to ${to} SKIPPED — SMTP credentials not set in environment.`);
-        return { success: false, skipped: true, reason: 'SMTP not configured on server. Set SMTP_HOST, SMTP_USER, SMTP_PASS environment variables.' };
+        console.warn(`⚠️  EMAIL to ${to} SKIPPED — BREVO_API_KEY not set in environment.`);
+        return { success: false, skipped: true, reason: 'Brevo API not configured on server. Set BREVO_API_KEY environment variable.' };
       }
 
-      const transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: Number(process.env.SMTP_PORT) || 587,
-        secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
+      const mailFrom = process.env.MAIL_FROM || `GymSoft <noreply@gymsoftware.space>`;
+      let senderName = "GymSoft";
+      let senderEmail = "noreply@gymsoftware.space";
+      const match = mailFrom.match(/(.*)<(.*)>/);
+      if (match) {
+          senderName = match[1].trim();
+          senderEmail = match[2].trim();
+      } else {
+          senderEmail = mailFrom.trim();
+      }
+
+      const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": brevoApiKey,
+          "Content-Type": "application/json",
+          "Accept": "application/json"
         },
-        tls: { rejectUnauthorized: false }
+        body: JSON.stringify({
+          sender: { name: senderName, email: senderEmail },
+          to: [{ email: to }],
+          subject: subject || "GymSoft — Gym Notification",
+          htmlContent: buildEmailHtml(message),
+          textContent: message
+        })
       });
 
-      await transporter.sendMail({
-        from: process.env.MAIL_FROM || `GymSoft <${smtpUser}>`,
-        to,
-        subject: subject || "GymSoft — Gym Notification",
-        text: message,
-        html: buildEmailHtml(message),
-      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Brevo API Error: ${JSON.stringify(errorData)}`);
+      }
 
       await pool.query(`UPDATE notificationlog SET status = 'SENT' WHERE id = ?`, [logId]);
       console.log(`✉️ Email sent to ${to}`);
