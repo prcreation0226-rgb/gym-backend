@@ -8,7 +8,7 @@ const templatesToUpdate = [
   { key: 'MEMBER_PLAN_ASSIGNED', name: 'Plan Assigned', subject: 'Plan Assigned - {GymName}', message: 'Hi {Name},\n\n{PlanName} has been assigned to you at {GymName}.\n\nPlan Details:\nValid till: {Validity}\nDate/Time: {DateTime}\n\nThank you!', vars: '["Name", "PlanName", "GymName", "Validity", "DateTime"]' },
   { key: 'MEMBER_ATTENDANCE', name: 'Member Attendance', subject: 'Attendance Marked - {GymName}', message: 'Hi {Name},\n\nYour attendance at {GymName} has been marked as {Status}.\n\nDate: {Date}\nTime: {Time}\n\nThank you!', vars: '["Name", "Date", "Status", "GymName", "Time"]' },
   { key: 'DIET_PLAN_ASSIGNED', name: 'Diet Plan Assigned', subject: 'New Diet Plan - {GymName}', message: 'Hi {Name},\n\nA new diet plan has been assigned to you at {GymName}.\n\nDiet Details:\n{DietDetails}\n\nTrainer: {TrainerName}\n\nPlease check your dashboard for more details.', vars: '["Name", "GymName", "DietDetails", "TrainerName"]' },
-  { key: 'WORKOUT_PLAN_ASSIGNED', name: 'Workout Plan Assigned', subject: 'New Workout Plan - {GymName}', message: 'Hi {Name},\n\nA new workout plan has been assigned to you at {GymName}.\n\nTrainer: {TrainerName}\n\nPlease check your dashboard for more details.', vars: '["Name", "GymName", "TrainerName"]' }
+  { key: 'WORKOUT_PLAN_ASSIGNED', name: 'Workout Plan Assigned', subject: 'New Workout Plan - {GymName}', message: 'Hi {Name},\n\nA new workout plan has been assigned to you at {GymName}.\n\nWorkout Details:\n{WorkoutDetails}\n\nTrainer: {TrainerName}\n\nPlease check your dashboard for more details.', vars: '["Name", "GymName", "WorkoutDetails", "TrainerName"]' }
 ];
 
 async function run() {

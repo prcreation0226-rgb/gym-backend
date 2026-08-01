@@ -70,6 +70,34 @@ export const assignWorkoutPlanService = async (memberId, workoutPlanId) => {
     );
     const member = memberRows[0];
     const planTitle = assignedPlan[0]?.title || "Workout Plan";
+    const createdBy = assignedPlan[0]?.createdBy;
+
+    // Fetch Gym Name and Trainer Name
+    let gymName = "GymSoft";
+    let trainerName = "Your Trainer";
+
+    if (member && member.adminId) {
+      const [adminRows] = await pool.query("SELECT gymName FROM user WHERE id = ?", [member.adminId]);
+      if (adminRows.length > 0 && adminRows[0].gymName) {
+        gymName = adminRows[0].gymName;
+      }
+    }
+    
+    if (createdBy) {
+      const [creatorRows] = await pool.query("SELECT fullName FROM user WHERE id = ?", [createdBy]);
+      if (creatorRows.length > 0) {
+        trainerName = creatorRows[0].fullName;
+      }
+    }
+
+    // Format Workout Details
+    let workoutDetails = "No exercises found in this plan.";
+    const validExercises = assignedPlan.filter(e => e.exerciseId);
+    if (validExercises.length > 0) {
+      workoutDetails = validExercises.map(e => 
+        `- ${e.exerciseName} (${e.sets} Sets x ${e.reps} Reps)`
+      ).join('\\n');
+    }
 
     if (member && member.userId) {
       await sendTemplatedNotification({
@@ -81,6 +109,9 @@ export const assignWorkoutPlanService = async (memberId, workoutPlanId) => {
         receiverPhone: member.phone,
         variables: {
           Name: member.fullName,
+          GymName: gymName,
+          WorkoutDetails: workoutDetails,
+          TrainerName: trainerName
         },
         referenceType: 'WORKOUT_PLAN',
         referenceId: workoutPlanId.toString(),
