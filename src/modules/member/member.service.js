@@ -1056,6 +1056,10 @@ export const deleteMemberService = async (id) => {
       ["DELETE FROM diet_plan WHERE memberId = ?", [id]],
       ["DELETE FROM attendance WHERE memberId = ?", [id]],
       ["DELETE FROM leaderboard WHERE memberId = ?", [id]],
+      ["DELETE FROM dietplanassignment WHERE memberId = ?", [id]],
+      ["DELETE FROM workoutplanassignment WHERE memberId = ?", [id]],
+      ["DELETE FROM unified_bookings WHERE memberId = ?", [id]],
+      ["DELETE FROM healthlog WHERE memberId = ?", [id]],
     ];
 
     for (const [sql, params] of relatedTables) {
