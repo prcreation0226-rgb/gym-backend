@@ -7,7 +7,7 @@ export const createPurchaseService = async (data) => {
   const [result] = await pool.query(
     `INSERT INTO purchase (selectedPlan, companyName, email, billingDuration, startDate, amount, phone, adminName, branchName, gstNumber, city, profileImage, password, visiblePassword, paymentMethod, paymentDetails) 
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [selectedPlan, companyName, email, billingDuration, new Date(startDate), amount || 0, phone || "", adminName || "", branchName || "", gstNumber || null, city || null, profileImage || null, password || null, visiblePassword || null, paymentMethod || null, paymentDetails || null]
+    [selectedPlan, companyName, email, billingDuration || 'Not Specified', new Date(startDate), amount || 0, phone || "", adminName || "", branchName || "", gstNumber || null, city || null, profileImage || null, password || null, visiblePassword || null, paymentMethod || null, paymentDetails || null]
   );
 
   const purchaseId = result.insertId;
