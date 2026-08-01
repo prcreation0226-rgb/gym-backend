@@ -433,6 +433,13 @@ export const getScheduledClassesWithBookingStatusService = async (
   memberId,
   adminId
 ) => {
+  // Auto-update past scheduled classes to Completed
+  await pool.query(`
+    UPDATE classschedule 
+    SET status = 'Completed' 
+    WHERE date < CURDATE() AND status = 'Scheduled'
+  `);
+
   /* ================================
      1️⃣ check member (OPTIONAL)
      ❌ do NOT block if not found
@@ -488,9 +495,10 @@ export const getScheduledClassesWithBookingStatusService = async (
       ON cs.trainerId = u.id
 
     -- booking ONLY if member is valid
-    LEFT JOIN booking bk
-      ON bk.scheduleId = cs.id
+    LEFT JOIN unified_bookings bk
+      ON bk.classId = cs.id
      AND bk.memberId = ?
+     AND bk.bookingStatus != 'Cancelled'
 
     LEFT JOIN member m
       ON m.id = bk.memberId
@@ -499,8 +507,9 @@ export const getScheduledClassesWithBookingStatusService = async (
       ON mu.id = m.userId
 
     -- total bookings
-    LEFT JOIN booking bk2
-      ON bk2.scheduleId = cs.id
+    LEFT JOIN unified_bookings bk2
+      ON bk2.classId = cs.id
+     AND bk2.bookingStatus != 'Cancelled'
 
     WHERE (u.adminId = ? OR cs.adminId = ?)
 
@@ -553,27 +562,41 @@ export const getScheduledClassesWithBookingStatusService = async (
 };
 
 export const cancelBookingService = async (memberId, scheduleId) => {
+  let realMemberId = memberId;
+  const [memberRows] = await pool.query("SELECT id FROM member WHERE id = ?", [memberId]);
+  if (memberRows.length === 0) {
+    const [userRows] = await pool.query("SELECT id FROM member WHERE userId = ?", [memberId]);
+    if (userRows.length > 0) realMemberId = userRows[0].id;
+  }
+
   const [existingRows] = await pool.query(
-    "SELECT * FROM booking WHERE memberId = ? AND scheduleId = ?",
-    [memberId, scheduleId]
+    "SELECT id FROM unified_bookings WHERE memberId = ? AND classId = ? AND bookingStatus != 'Cancelled'",
+    [realMemberId, scheduleId]
   );
   const existing = existingRows[0];
   if (!existing) throw { status: 400, message: "No booking found" };
 
-  await pool.query("DELETE FROM booking WHERE id = ?", [existing.id]);
+  await pool.query("UPDATE unified_bookings SET bookingStatus = 'Cancelled' WHERE id = ?", [existing.id]);
 
   return true;
 };
 
 export const memberBookingsService = async (memberId) => {
+  let realMemberId = memberId;
+  const [memberRows] = await pool.query("SELECT id FROM member WHERE id = ?", [memberId]);
+  if (memberRows.length === 0) {
+    const [userRows] = await pool.query("SELECT id FROM member WHERE userId = ?", [memberId]);
+    if (userRows.length > 0) realMemberId = userRows[0].id;
+  }
+
   const [rows] = await pool.query(
     `SELECT b.*, cs.date, cs.startTime, cs.endTime, cs.day, cs.className AS className, u.fullName AS trainerName
-     FROM booking b
-     LEFT JOIN classschedule cs ON b.scheduleId = cs.id
+     FROM unified_bookings b
+     LEFT JOIN classschedule cs ON b.classId = cs.id
      LEFT JOIN user u ON cs.trainerId = u.id
-     WHERE b.memberId = ?
+     WHERE b.memberId = ? AND b.bookingStatus != 'Cancelled'
      ORDER BY b.id DESC`,
-    [memberId]
+    [realMemberId]
   );
   return rows;
 };
@@ -582,6 +605,13 @@ export const memberBookingsService = async (memberId) => {
  * SCHEDULE CRUD
  **************************************/
 export const getAllScheduledClassesService = async (adminId) => {
+  // Auto-update past scheduled classes to Completed
+  await pool.query(`
+    UPDATE classschedule 
+    SET status = 'Completed' 
+    WHERE date < CURDATE() AND status = 'Scheduled'
+  `);
+
   const [rows] = await pool.query(
     `
     SELECT 
