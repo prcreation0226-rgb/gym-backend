@@ -178,13 +178,13 @@ export const createBookingRequest = async (req, res) => {
        5️⃣ EMIT SOCKET NOTIFICATION TO ADMIN
     ------------------------- */
     try {
-      emitToUser(adminId, "new_booking_request", {
-        message: `New plan purchase request from ${resolvedFullName || phone}`,
-        bookingRequestId: bookingResult.insertId,
-        planName: plan.name,
+      await sendAppNotification(adminId, `New plan purchase request from ${resolvedFullName || phone} for ${plan.name}`, {
+        title: "New Plan Booking Request",
+        reference_type: "booking_request",
+        reference_id: bookingResult.insertId
       });
     } catch (socketErr) {
-      console.error("Socket emit error:", socketErr);
+      console.error("Notification emit error:", socketErr);
     }
 
     return res.status(201).json({

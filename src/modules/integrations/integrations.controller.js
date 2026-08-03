@@ -109,6 +109,8 @@ export const updateAdminUPI = async (req, res) => {
 
     if (req.files && req.files.upiQrCodeFile) {
       upiQrCode = await uploadToCloudinary(req.files.upiQrCodeFile, "gym/upi-qr");
+    } else if (req.body.deleteQrCode === 'true') {
+      upiQrCode = null;
     }
 
     let query = "UPDATE tenantintegrationsettings SET upiQrCode = ? WHERE tenantId = ?";
