@@ -175,7 +175,7 @@ export const createBookingRequest = async (req, res) => {
     await connection.commit();
 
     /* -------------------------
-       5️⃣ EMIT SOCKET NOTIFICATION TO ADMIN
+       5️⃣ EMIT SOCKET & EMAIL NOTIFICATION TO ADMIN
     ------------------------- */
     try {
       await sendAppNotification(adminId, `New plan purchase request from ${resolvedFullName || phone} for ${plan.name}`, {
@@ -183,6 +183,19 @@ export const createBookingRequest = async (req, res) => {
         reference_type: "booking_request",
         reference_id: bookingResult.insertId
       });
+
+      const [[adminRow]] = await connection.query(`SELECT email FROM user WHERE id = ?`, [adminId]);
+      if (adminRow && adminRow.email) {
+        await dispatchNotification({
+          category: "booking_request",
+          toEmail: adminRow.email,
+          toUserId: adminId,
+          subject: "New Plan Booking Request Received",
+          message: `Hello Admin,\n\nYou have received a new plan purchase request from ${resolvedFullName || phone} for the plan "${plan.name}".\n\nPlease log in to the admin dashboard to review and approve the request.`,
+          isSystemEvent: false,
+          adminIdForCredits: adminId
+        });
+      }
     } catch (socketErr) {
       console.error("Notification emit error:", socketErr);
     }
