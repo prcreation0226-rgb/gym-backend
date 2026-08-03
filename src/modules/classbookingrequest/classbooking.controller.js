@@ -35,11 +35,6 @@ export const createBookingRequest = async (req, res) => {
       userId = null
     } = req.body;
 
-    let paymentProofImage = null;
-    if (req.files && req.files.paymentProofImage) {
-      paymentProofImage = await uploadToCloudinary(req.files.paymentProofImage, "gym/payment-proofs");
-    }
-
     /* -------------------------
        1️⃣ BASIC VALIDATION
     ------------------------- */
