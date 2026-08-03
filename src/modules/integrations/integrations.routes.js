@@ -6,11 +6,12 @@ import {
   testRazorpay,
   testBrevo
 } from "./integrations.controller.js";
-import { authMiddleware } from "../../middlewares/auth.js";
+import { verifyToken } from "../../middlewares/auth.js";
 
 const router = express.Router();
 
-router.use(authMiddleware);
+// Apply auth middleware to all integration routes (Requires Admin/SuperAdmin)
+router.use(verifyToken(["ADMIN", "SUPERADMIN"]));
 
 router.get("/", getIntegrations);
 
