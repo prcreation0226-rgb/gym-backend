@@ -2,6 +2,7 @@ import { pool } from "../config/db.js";
 import { getIO, emitToUser } from "../config/socket.js";
 import { formatISTDate } from "./dateHelper.js";
 import { createAppNotification } from "../modules/appNotifications/appNotification.service.js";
+import { dispatchNotification } from "./notificationDispatcher.js";
 
 export const sendAppNotification = async (to, message, options = {}) => {
   try {
@@ -24,7 +25,7 @@ export const sendAppNotification = async (to, message, options = {}) => {
     }
 
     // Lookup user to get tenantId and precise role
-    const [[user]] = await pool.query("SELECT id, roleId, adminId FROM user WHERE id = ?", [to]);
+    const [[user]] = await pool.query("SELECT id, roleId, adminId, email FROM user WHERE id = ?", [to]);
     if (user) {
       let roleName = 'Member';
       if (user.roleId === 1) roleName = 'Super Admin';
@@ -45,6 +46,18 @@ export const sendAppNotification = async (to, message, options = {}) => {
         referenceType: reference_type,
         referenceId: reference_id ? reference_id.toString() : null
       });
+
+      if (user.email) {
+        await dispatchNotification({
+          category: "app_notification",
+          toEmail: user.email,
+          toUserId: user.id,
+          subject: title || 'Gym Notification',
+          message: message,
+          isSystemEvent: false,
+          adminIdForCredits: tenantId
+        });
+      }
     }
 
   } catch (err) {
@@ -67,7 +80,7 @@ export const notifyAdminAndStaff = async (adminId, message, options = {}) => {
     // Lookup Admin and all their staff (excluding members, roleId=4)
     // roleId=1 is Super Admin, usually excluded from tenant staff unless they are the admin.
     const [users] = await pool.query(
-      `SELECT id, roleId, adminId, fullName FROM user 
+      `SELECT id, roleId, adminId, fullName, email FROM user 
        WHERE (id = ? OR adminId = ?) 
        AND roleId != 4 AND roleId != 1`,
       [adminId, adminId]
@@ -91,6 +104,18 @@ export const notifyAdminAndStaff = async (adminId, message, options = {}) => {
         referenceType: reference_type,
         referenceId: reference_id ? reference_id.toString() : null
       });
+
+      if (u.email) {
+        await dispatchNotification({
+          category: "app_notification",
+          toEmail: u.email,
+          toUserId: u.id,
+          subject: title || 'Gym Notification',
+          message: message,
+          isSystemEvent: false,
+          adminIdForCredits: adminId
+        });
+      }
     }
 
   } catch (err) {
