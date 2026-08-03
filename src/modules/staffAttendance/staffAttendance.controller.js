@@ -1,5 +1,6 @@
 import { pool } from "../../config/db.js";
-import { sendAppNotification } from "../../utils/notificationHelper.js";
+import { notifyAdminAndStaff } from "../../utils/notificationHelper.js";
+import { emitToUser } from "../../config/socket.js";
 
 // staffId = staff.id (from frontend)
 export const staffCheckIn = async (req, res, next) => {
@@ -57,14 +58,21 @@ export const staffCheckIn = async (req, res, next) => {
       ]
     );
 
-    // Notification Logic: Notify Admin
+    // Notification Logic: Notify Admin & Staff
     const [staffRows] = await pool.query(`SELECT s.adminId, u.fullName FROM staff s JOIN user u ON s.userId = u.id WHERE s.id = ?`, [staffId]);
     if (staffRows.length > 0 && staffRows[0].adminId) {
       const msg = `${staffRows[0].fullName} has checked in.`;
-      await sendAppNotification(staffRows[0].adminId, msg, {
+      const adminId = staffRows[0].adminId;
+      await notifyAdminAndStaff(adminId, msg, {
         title: "Staff Checked In",
         reference_type: "ATTENDANCE",
         reference_id: result.insertId
+      });
+      emitToUser(`admin_${adminId}`, "checkin_update", {
+        type: "staff",
+        action: "checkin",
+        memberId: staffId,
+        branchId
       });
     }
 
@@ -117,14 +125,20 @@ export const staffCheckOut = async (req, res, next) => {
       [finalCheckOut, attendanceId]
     );
 
-    // Notification Logic: Notify Admin
+    // Notification Logic: Notify Admin & Staff
     const [staffRows] = await pool.query(`SELECT s.adminId, u.fullName FROM staff s JOIN user u ON s.userId = u.id WHERE s.id = ?`, [record.staffId]);
     if (staffRows.length > 0 && staffRows[0].adminId) {
       const msg = `${staffRows[0].fullName} has checked out.`;
-      await sendAppNotification(staffRows[0].adminId, msg, {
+      const adminId = staffRows[0].adminId;
+      await notifyAdminAndStaff(adminId, msg, {
         title: "Staff Checked Out",
         reference_type: "ATTENDANCE",
         reference_id: attendanceId
+      });
+      emitToUser(`admin_${adminId}`, "checkin_update", {
+        type: "staff",
+        action: "checkout",
+        id: attendanceId
       });
     }
 

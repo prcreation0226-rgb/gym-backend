@@ -292,13 +292,14 @@ export const getSalesDashboard = async (req, res, next) => {
       SELECT 
         DATE_FORMAT(m.joinDate, '%b') AS month,
         YEAR(m.joinDate) AS year,
+        MONTH(m.joinDate) AS monthNum,
         SUM(m.amountPaid) AS total
       FROM member m
       WHERE m.adminId = ?
         ${branchId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
         AND m.joinDate >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
-      GROUP BY year, month, MONTH(m.joinDate)
-      ORDER BY year, MONTH(m.joinDate)
+      GROUP BY year, month, monthNum
+      ORDER BY year, monthNum
       `,
       periodParams
     );
@@ -309,14 +310,15 @@ export const getSalesDashboard = async (req, res, next) => {
       SELECT 
         DATE_FORMAT(e.date, '%b') AS month,
         YEAR(e.date) AS year,
+        MONTH(e.date) AS monthNum,
         SUM(e.amount) AS total
       FROM expense e
       JOIN branch b ON e.branchId = b.id
       WHERE b.adminId = ?
         ${branchId ? "AND (e.branchId = ? OR e.branchId IS NULL)" : ""}
         AND e.date >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
-      GROUP BY year, month, MONTH(e.date)
-      ORDER BY year, MONTH(e.date)
+      GROUP BY year, month, monthNum
+      ORDER BY year, monthNum
       `,
       periodParams
     );

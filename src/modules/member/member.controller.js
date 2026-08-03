@@ -90,7 +90,7 @@ export const createMember = async (req, res, next) => {
 export const renewMembershipPlan = async (req, res, next) => {
   try {
     const memberId = parseInt(req.params.memberId);
-    const { planId, paymentMode, amountPaid } = req.body;
+    const { planId, paymentMode, amountPaid, transactionId } = req.body;
 
     if (!planId || !paymentMode || amountPaid === undefined) {
       return res.status(400).json({
@@ -99,7 +99,13 @@ export const renewMembershipPlan = async (req, res, next) => {
       });
     }
 
-    const data = await renewMembershipService(memberId, req.body);
+    let paymentProofImage = null;
+    if (req.files && req.files.paymentProofImage) {
+      paymentProofImage = await uploadToCloudinary(req.files.paymentProofImage, "gym/payment-proofs");
+    }
+
+    const payload = { ...req.body, paymentProofImage, transactionId };
+    const data = await renewMembershipService(memberId, payload);
 
     res.json({
       success: true,

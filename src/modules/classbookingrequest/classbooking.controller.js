@@ -30,6 +30,7 @@ export const createBookingRequest = async (req, res) => {
       planId,
       price,
       upiId = null,
+      paymentMode = "Cash",
       userId = null
     } = req.body;
 
@@ -140,13 +141,22 @@ export const createBookingRequest = async (req, res) => {
     }
 
     /* -------------------------
-       4️⃣ CREATE BOOKING REQUEST
+       4️⃣ UPLOAD PAYMENT PROOF
+    ------------------------- */
+    let paymentProofImage = null;
+    if (req.files && req.files.paymentProofImage) {
+      const { uploadToCloudinary } = await import("../../config/cloudinary.js");
+      paymentProofImage = await uploadToCloudinary(req.files.paymentProofImage, "gym/payment-proofs");
+    }
+
+    /* -------------------------
+       5️⃣ CREATE BOOKING REQUEST
     ------------------------- */
     const [bookingResult] = await connection.query(
       `
       INSERT INTO booking_requests
-        (adminId, userId, memberId, planId, price, branchId, upiId, status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
+        (adminId, userId, memberId, planId, price, branchId, upiId, paymentMode, paymentProofImage, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
       `,
       [
         adminId,
@@ -155,7 +165,9 @@ export const createBookingRequest = async (req, res) => {
         planId,
         price,
         branchId,
-        upiId
+        upiId,
+        paymentMode,
+        paymentProofImage
       ]
     );
 
@@ -403,7 +415,6 @@ export const approveBookingRequest = async (req, res) => {
         [hashedPassword, booking.userId]
       );
 
-      // Create plan assignment for new member
       await connection.query(
         `INSERT INTO member_plan_assignment 
           (memberId, planId, membershipFrom, membershipTo, paymentMode, amountPaid, status, assignedBy, assignedAt)
@@ -413,12 +424,29 @@ export const approveBookingRequest = async (req, res) => {
           booking.planId,
           membershipFrom,
           membershipTo,
-          booking.upiId ? "UPI" : "Cash",
+          booking.paymentMode || (booking.upiId ? "UPI" : "Cash"),
           booking.price || plan.price,
           booking.adminId
         ]
       );
     }
+
+    // Insert payment record so revenue is tracked
+    const invoiceNo = "INV-" + Date.now() + "-" + Math.floor(Math.random() * 999);
+    await connection.query(
+      `INSERT INTO payment (memberId, planId, amount, invoiceNo, paymentDate, collectedByName, paymentMode, transactionId, paymentProofImage, status) 
+       VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, 'Completed')`,
+      [
+        activeMemberId, 
+        booking.planId, 
+        booking.price || plan.price, 
+        invoiceNo, 
+        "Admin", 
+        booking.paymentMode || (booking.upiId ? "UPI" : "Cash"),
+        booking.upiId || null,
+        booking.paymentProofImage || null
+      ]
+    );
 
     /* Update booking_requests status */
     await connection.query(
@@ -497,6 +525,8 @@ export const getAllBookingRequests = async (req, res, next) => {
       `
       SELECT 
         br.*,
+        br.paymentProofImage,
+        br.paymentMode,
 
         u.fullName AS memberName,        -- ✅ from user table
         u.email AS memberEmail,

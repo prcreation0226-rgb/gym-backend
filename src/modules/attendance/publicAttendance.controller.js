@@ -14,8 +14,11 @@ export const publicMemberCheckIn = async (req, res, next) => {
 
     // Find member by phone or email
     const [members] = await pool.query(
-      "SELECT id, branchId FROM member WHERE adminId = ? AND (phone = ? OR email = ?)",
-      [adminId, identifier, identifier]
+      `SELECT m.id, m.branchId 
+       FROM member m 
+       LEFT JOIN user u ON m.userId = u.id 
+       WHERE m.adminId = ? AND (m.phone = ? OR m.email = ? OR u.phone = ? OR u.email = ?)`,
+      [adminId, identifier, identifier, identifier, identifier]
     );
 
     if (members.length === 0) {
@@ -46,8 +49,11 @@ export const publicMemberCheckOut = async (req, res, next) => {
     }
 
     const [members] = await pool.query(
-      "SELECT id, branchId FROM member WHERE adminId = ? AND (phone = ? OR email = ?)",
-      [adminId, identifier, identifier]
+      `SELECT m.id, m.branchId 
+       FROM member m 
+       LEFT JOIN user u ON m.userId = u.id 
+       WHERE m.adminId = ? AND (m.phone = ? OR m.email = ? OR u.phone = ? OR u.email = ?)`,
+      [adminId, identifier, identifier, identifier, identifier]
     );
 
     if (members.length === 0) {
@@ -93,7 +99,10 @@ export const publicStaffCheckIn = async (req, res, next) => {
 
     // Find staff
     const [staffs] = await pool.query(
-      "SELECT id, branchId FROM staff WHERE adminId = ? AND (phone = ? OR email = ?)",
+      `SELECT s.id, s.branchId 
+       FROM staff s 
+       LEFT JOIN user u ON s.userId = u.id 
+       WHERE s.adminId = ? AND (u.phone = ? OR u.email = ?)`,
       [adminId, identifier, identifier]
     );
 
@@ -123,7 +132,10 @@ export const publicStaffCheckOut = async (req, res, next) => {
     }
 
     const [staffs] = await pool.query(
-      "SELECT id, branchId FROM staff WHERE adminId = ? AND (phone = ? OR email = ?)",
+      `SELECT s.id, s.branchId 
+       FROM staff s 
+       LEFT JOIN user u ON s.userId = u.id 
+       WHERE s.adminId = ? AND (u.phone = ? OR u.email = ?)`,
       [adminId, identifier, identifier]
     );
 
@@ -133,6 +145,17 @@ export const publicStaffCheckOut = async (req, res, next) => {
 
     const staff = staffs[0];
 
+    // Find active attendance record
+    const [active] = await pool.query(
+      "SELECT id FROM staffattendance WHERE staffId = ? AND DATE(checkIn) = CURDATE() AND checkOut IS NULL ORDER BY id DESC LIMIT 1",
+      [staff.id]
+    );
+
+    if (active.length === 0) {
+      return res.status(400).json({ success: false, message: "No active check-in found for today." });
+    }
+
+    req.params.id = active[0].id;
     req.body.staffId = staff.id;
     req.body.qrAdminId = adminId;
     req.body.branchId = staff.branchId || branchId;

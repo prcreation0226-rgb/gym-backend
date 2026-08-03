@@ -409,7 +409,7 @@ export const createMemberService = async (data) => {
 //   };
 // };
 export const renewMembershipService = async (memberId, body) => {
-  const { planId, paymentMode, amountPaid, adminId, membershipFrom } = body;
+  const { planId, paymentMode, amountPaid, adminId, membershipFrom, transactionId, paymentProofImage } = body;
 
   // 1️⃣ Member check
   const [[member]] = await pool.query("SELECT * FROM member WHERE id = ?", [
@@ -496,10 +496,11 @@ export const renewMembershipService = async (memberId, body) => {
     const actualAmount = amountPaid || plan.price;
     if (Number(actualAmount) > 0) {
       const invoiceNo = "INV-" + Date.now() + "-" + Math.floor(Math.random() * 999);
+      const paymentStatus = (paymentMode === "UPI" || paymentMode === "Cash") ? "Pending" : "Completed";
       await pool.query(
-        `INSERT INTO payment (memberId, planId, amount, invoiceNo, paymentDate, collectedByName) 
-         VALUES (?, ?, ?, ?, NOW(), ?)`,
-        [memberId, planId, actualAmount, invoiceNo, "Admin"]
+        `INSERT INTO payment (memberId, planId, amount, invoiceNo, paymentDate, collectedByName, paymentMode, transactionId, paymentProofImage, status) 
+         VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)`,
+        [memberId, planId, actualAmount, invoiceNo, "Admin", paymentMode, transactionId || null, paymentProofImage || null, paymentStatus]
       );
     }
   }

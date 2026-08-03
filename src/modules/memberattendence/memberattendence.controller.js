@@ -444,8 +444,9 @@ export const memberCheckOut = async (req, res, next) => {
         
         try {
           // Send checkout notification to member
+          let memberRows = [];
           if (record.memberId) {
-            const [memberRows] = await pool.query(
+            [memberRows] = await pool.query(
               "SELECT m.userId, m.phone, m.fullName, u.email FROM member m LEFT JOIN user u ON m.userId = u.id WHERE m.id = ?", 
               [record.memberId]
             );
@@ -481,6 +482,15 @@ export const memberCheckOut = async (req, res, next) => {
               });
             }
           }
+
+          // Also notify Admin & Staff Dashboards
+          const memberName = record.memberId ? (memberRows?.[0]?.fullName || "Member") : "Staff";
+          const checkOutTime = finalCheckOut.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
+          await notifyAdminAndStaff(adminId, `${memberName} has checked out at ${checkOutTime}.`, {
+            title: "New Check-Out",
+            reference_type: "ATTENDANCE"
+          });
+
         } catch (notifErr) {
           console.error("Failed to send checkout notification:", notifErr);
         }
