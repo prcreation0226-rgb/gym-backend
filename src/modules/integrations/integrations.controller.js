@@ -1,6 +1,7 @@
 import { pool } from "../../config/db.js";
 import { encrypt } from "../../utils/encryption.js";
 import { BrevoCredentialResolver, PaymentCredentialResolver, WhatsAppCredentialResolver } from "../../utils/credentialResolvers.js";
+import { uploadToCloudinary } from "../../config/cloudinary.js";
 
 // Fetch integration statuses (Masked credentials)
 export const getIntegrations = async (req, res) => {
@@ -97,10 +98,21 @@ export const updateBrevo = async (req, res) => {
 export const updateAdminUPI = async (req, res) => {
   try {
     const tenantId = req.user.id;
-    const { upiQrCode, upiId, upiAccountHolder, paymentInstructions } = req.body;
-    
-    let query = "UPDATE tenantintegrationsettings SET upiQrCode = ?, upiId = ?, upiAccountHolder = ?, paymentInstructions = ? WHERE tenantId = ?";
-    const params = [upiQrCode, upiId, upiAccountHolder, paymentInstructions, tenantId];
+    let { upiId, upiAccountHolder, paymentInstructions } = req.body;
+    let upiQrCode = null;
+
+    // First fetch existing to keep the QR code if no new file is uploaded
+    const [rows] = await pool.query("SELECT upiQrCode FROM tenantintegrationsettings WHERE tenantId = ?", [tenantId]);
+    if (rows.length > 0) {
+      upiQrCode = rows[0].upiQrCode;
+    }
+
+    if (req.files && req.files.upiQrCodeFile) {
+      upiQrCode = await uploadToCloudinary(req.files.upiQrCodeFile, "gym/upi-qr");
+    }
+
+    let query = "UPDATE tenantintegrationsettings SET upiQrCode = ? WHERE tenantId = ?";
+    const params = [upiQrCode, tenantId];
     
     await pool.query(query, params);
     res.status(200).json({ success: true, message: "UPI Payment settings updated successfully" });
