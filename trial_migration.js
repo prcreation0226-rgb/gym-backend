@@ -40,7 +40,42 @@ async function runMigration() {
     }
     console.log("automation_settings table ready.");
 
-    // 3. (Removed) Message Templates Table creation is now handled by src/config/db.js
+    // 3. Add UPI and Manual Payment Columns
+    console.log("Adding manual payment columns to tenantintegrationsettings and payment tables...");
+    try {
+      await pool.query(`ALTER TABLE payment 
+        ADD COLUMN paymentMode VARCHAR(50) DEFAULT 'Cash',
+        ADD COLUMN transactionId VARCHAR(100) DEFAULT NULL,
+        ADD COLUMN paymentProofImage VARCHAR(500) DEFAULT NULL,
+        ADD COLUMN status VARCHAR(50) DEFAULT 'Approved',
+        ADD COLUMN rejectionRemarks TEXT DEFAULT NULL;
+      `);
+      console.log("Added payment columns.");
+    } catch (e) {
+      if (e.code === 'ER_DUP_FIELDNAME') {
+        console.log("Payment columns already exist.");
+      } else {
+        throw e;
+      }
+    }
+
+    try {
+      await pool.query(`ALTER TABLE tenantintegrationsettings 
+        ADD COLUMN upiQrCode VARCHAR(500) DEFAULT NULL,
+        ADD COLUMN upiId VARCHAR(255) DEFAULT NULL,
+        ADD COLUMN upiAccountHolder VARCHAR(255) DEFAULT NULL,
+        ADD COLUMN paymentInstructions TEXT DEFAULT NULL;
+      `);
+      console.log("Added upi columns to tenantintegrationsettings.");
+    } catch (e) {
+      if (e.code === 'ER_DUP_FIELDNAME') {
+        console.log("UPI columns already exist in tenantintegrationsettings.");
+      } else {
+        throw e;
+      }
+    }
+
+    // 4. (Removed) Message Templates Table creation is now handled by src/config/db.js
 
     console.log("Migration completed successfully.");
     process.exit(0);
