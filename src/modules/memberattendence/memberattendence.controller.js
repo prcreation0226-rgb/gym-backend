@@ -441,6 +441,49 @@ export const memberCheckOut = async (req, res, next) => {
           action: "checkout",
           id: attendanceId
         });
+        
+        try {
+          // Send checkout notification to member
+          if (record.memberId) {
+            const [memberRows] = await pool.query(
+              "SELECT m.userId, m.phone, m.fullName, u.email FROM member m LEFT JOIN user u ON m.userId = u.id WHERE m.id = ?", 
+              [record.memberId]
+            );
+            
+            if (memberRows.length > 0) {
+              const member = memberRows[0];
+              const checkOutTime = finalCheckOut.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
+              const checkOutDate = finalCheckOut.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+              
+              let gymName = "GymSoft";
+              const [adminRows] = await pool.query("SELECT gymName FROM user WHERE id = ?", [adminId]);
+              if (adminRows.length > 0 && adminRows[0].gymName) {
+                gymName = adminRows[0].gymName;
+              }
+
+              await sendTemplatedNotification({
+                eventKey: 'MEMBER_ATTENDANCE',
+                tenantId: adminId,
+                receiverId: member.userId,
+                receiverRole: 'Member',
+                receiverEmail: member.email,
+                receiverPhone: member.phone,
+                variables: {
+                  Name: member.fullName,
+                  Date: checkOutDate,
+                  Status: 'Checked Out',
+                  GymName: gymName,
+                  Time: checkOutTime
+                },
+                referenceType: 'ATTENDANCE',
+                referenceId: record.memberId.toString(),
+                actionUrl: '/member-dashboard'
+              });
+            }
+          }
+        } catch (notifErr) {
+          console.error("Failed to send checkout notification:", notifErr);
+        }
       }
     } catch (err) {
       console.error("Failed to emit checkout socket update:", err);

@@ -27,6 +27,9 @@ export const createMemberService = async (data) => {
     adminId,
     profileImage,
     goal,
+    transactionId,
+    paymentProofImage,
+    paymentStatus,
   } = data;
 
   if (!fullName) {
@@ -227,9 +230,9 @@ export const createMemberService = async (data) => {
         if (Number(actualAmount) > 0) {
           const invoiceNo = "INV-" + Date.now() + "-" + Math.floor(Math.random() * 999);
           await pool.query(
-            `INSERT INTO payment (memberId, planId, amount, invoiceNo, paymentDate, collectedByName) 
-             VALUES (?, ?, ?, ?, NOW(), ?)`,
-            [memberId, planIdNum, actualAmount, invoiceNo, "Admin"]
+            `INSERT INTO payment (memberId, planId, amount, invoiceNo, paymentDate, collectedByName, paymentMode, transactionId, paymentProofImage, status) 
+             VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?)`,
+            [memberId, planIdNum, actualAmount, invoiceNo, "Admin", paymentMode || 'Cash', transactionId || null, paymentProofImage || null, paymentStatus || 'Approved']
           );
         }
 

@@ -23,7 +23,16 @@ export const getMemberDashboardService = async (memberId, adminId) => {
 
   /* MEMBERSHIP STATUS */
   let membershipStatus = "No Plan";
-  if (member.membershipFrom && member.membershipTo) {
+  
+  // Check for pending payments first
+  const [[pendingPayment]] = await pool.query(
+    `SELECT status FROM payment WHERE memberId = ? AND status = 'Pending' ORDER BY createdAt DESC LIMIT 1`,
+    [memberId]
+  );
+  
+  if (pendingPayment) {
+    membershipStatus = "Pending Approval";
+  } else if (member.membershipFrom && member.membershipTo) {
     membershipStatus =
       new Date(member.membershipTo) < new Date()
         ? "Expired"
@@ -74,6 +83,18 @@ export const getMemberDashboardService = async (memberId, adminId) => {
     LIMIT 1
     `,
     [adminId]
+  );
+
+  /* 5️⃣ RECENT PAYMENTS */
+  const [payments] = await pool.query(
+    `
+    SELECT id, invoiceNo, amount, paymentMode, paymentDate, status
+    FROM payment
+    WHERE memberId = ?
+    ORDER BY paymentDate DESC
+    LIMIT 5
+    `,
+    [memberId]
   );
 
   return {

@@ -29,6 +29,10 @@ export const getIntegrations = async (req, res) => {
         brevoApiKey: settings.brevoApiKey ? "************" : null,
         brevoSenderEmail: settings.brevoSenderEmail || null,
         brevoSenderName: settings.brevoSenderName || null,
+        upiQrCode: settings.upiQrCode || null,
+        upiId: settings.upiId || null,
+        upiAccountHolder: settings.upiAccountHolder || null,
+        paymentInstructions: settings.paymentInstructions || null,
       }
     });
   } catch (err) {
@@ -84,6 +88,22 @@ export const updateBrevo = async (req, res) => {
     
     await pool.query(query, params);
     res.status(200).json({ success: true, message: "Brevo settings updated successfully" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Update Admin UPI Settings
+export const updateAdminUPI = async (req, res) => {
+  try {
+    const tenantId = req.user.id;
+    const { upiQrCode, upiId, upiAccountHolder, paymentInstructions } = req.body;
+    
+    let query = "UPDATE tenantintegrationsettings SET upiQrCode = ?, upiId = ?, upiAccountHolder = ?, paymentInstructions = ? WHERE tenantId = ?";
+    const params = [upiQrCode, upiId, upiAccountHolder, paymentInstructions, tenantId];
+    
+    await pool.query(query, params);
+    res.status(200).json({ success: true, message: "UPI Payment settings updated successfully" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

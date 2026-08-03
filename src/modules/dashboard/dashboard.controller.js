@@ -297,7 +297,7 @@ export const getSalesDashboard = async (req, res, next) => {
       WHERE m.adminId = ?
         ${branchId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
         AND m.joinDate >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
-      GROUP BY year, month
+      GROUP BY year, month, MONTH(m.joinDate)
       ORDER BY year, MONTH(m.joinDate)
       `,
       periodParams
@@ -315,7 +315,7 @@ export const getSalesDashboard = async (req, res, next) => {
       WHERE b.adminId = ?
         ${branchId ? "AND (e.branchId = ? OR e.branchId IS NULL)" : ""}
         AND e.date >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
-      GROUP BY year, month
+      GROUP BY year, month, MONTH(e.date)
       ORDER BY year, MONTH(e.date)
       `,
       periodParams

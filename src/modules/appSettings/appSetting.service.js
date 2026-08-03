@@ -315,5 +315,17 @@ export const getAppSettingsByAdminIdService = async (adminId) => {
     return {}; // Return empty object instead of throwing 404 so frontend doesn't show errors for new admins
   }
 
-  return rows[0];
+  const appSettings = rows[0];
+
+  // Fetch UPI settings
+  const [upiRows] = await pool.query(
+    `SELECT upiQrCode, upiId, upiAccountHolder, paymentInstructions FROM tenantintegrationsettings WHERE tenantId = ? LIMIT 1`,
+    [validAdminId]
+  );
+
+  if (upiRows.length > 0) {
+    Object.assign(appSettings, upiRows[0]);
+  }
+
+  return appSettings;
 };

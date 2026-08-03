@@ -379,6 +379,11 @@ model payment {
   gstPercent       Float?
   collectedByName  String?   @db.VarChar(255)
   collectedByRole  String?   @db.VarChar(100)
+  paymentMode      String?   @default("Cash") @db.VarChar(50)
+  transactionId    String?   @db.VarChar(100)
+  paymentProofImage String?  @db.VarChar(500)
+  status           String?   @default("Approved") @db.VarChar(50)
+  rejectionRemarks String?   @db.Text
   member           member    @relation(fields: [memberId], references: [id], map: "Payment_memberId_fkey")
 
   @@index([memberId], map: "Payment_memberId_idx")
@@ -808,6 +813,10 @@ model tenantintegrationsettings {
   paymentGatewayEnabled Boolean   @default(false)
   emailEnabled          Boolean   @default(false)
   whatsappEnabled       Boolean   @default(false)
+  upiQrCode             String?   @db.VarChar(500)
+  upiId                 String?   @db.VarChar(255)
+  upiAccountHolder      String?   @db.VarChar(255)
+  paymentInstructions   String?   @db.Text
   isVerified            Boolean   @default(false)
   lastVerifiedAt        DateTime? @db.DateTime(0)
   lastTestStatus        String?   @db.VarChar(50)

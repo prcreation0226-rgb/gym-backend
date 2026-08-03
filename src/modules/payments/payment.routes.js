@@ -6,6 +6,7 @@ import {
   verifyMemberPayment,
   paymentHistory,
   allPayments,
+  verifyManualPayment
 } from "./payment.controller.js";
 
 const router = Router();
@@ -43,6 +44,12 @@ router.get(
   "/branch/:branchId",
   verifyToken(["Admin", "Superadmin", "receptionist", "Staff"]),
   allPayments
+);
+// Verify Manual Payment
+router.post(
+  "/verify-manual",
+  verifyToken(["Admin", "Superadmin", "Staff"]),
+  verifyManualPayment
 );
 
 export default router;

@@ -4,7 +4,8 @@ import {
   updateRazorpay,
   updateBrevo,
   testRazorpay,
-  testBrevo
+  testBrevo,
+  updateAdminUPI
 } from "./integrations.controller.js";
 import { verifyToken } from "../../middlewares/auth.js";
 
@@ -20,5 +21,7 @@ router.post("/razorpay/test", testRazorpay);
 
 router.put("/brevo", updateBrevo);
 router.post("/brevo/test", testBrevo);
+
+router.put("/upi", updateAdminUPI);
 
 export default router;
