@@ -6,7 +6,9 @@ import { staffCheckIn, staffCheckOut } from "../staffAttendance/staffAttendance.
 
 export const publicMemberCheckIn = async (req, res, next) => {
   try {
-    const { identifier, adminId, branchId } = req.body;
+    const adminId = req.body.adminId;
+    const branchId = req.body.branchId;
+    const identifier = req.body.identifier || req.body.phone;
 
     if (!identifier || !adminId) {
       return res.status(400).json({ success: false, message: "Email/Phone and Gym ID are required" });
@@ -42,7 +44,9 @@ export const publicMemberCheckIn = async (req, res, next) => {
 
 export const publicMemberCheckOut = async (req, res, next) => {
   try {
-    const { identifier, adminId, branchId } = req.body;
+    const adminId = req.body.adminId;
+    const branchId = req.body.branchId;
+    const identifier = req.body.identifier || req.body.phone;
 
     if (!identifier || !adminId) {
       return res.status(400).json({ success: false, message: "Email/Phone and Gym ID are required" });
@@ -91,7 +95,9 @@ export const publicMemberCheckOut = async (req, res, next) => {
 
 export const publicStaffCheckIn = async (req, res, next) => {
   try {
-    const { identifier, adminId, branchId } = req.body;
+    const adminId = req.body.adminId;
+    const branchId = req.body.branchId;
+    const identifier = req.body.identifier || req.body.phone;
 
     if (!identifier || !adminId) {
       return res.status(400).json({ success: false, message: "Email/Phone and Gym ID are required" });
@@ -125,7 +131,9 @@ export const publicStaffCheckIn = async (req, res, next) => {
 
 export const publicStaffCheckOut = async (req, res, next) => {
   try {
-    const { identifier, adminId, branchId } = req.body;
+    const adminId = req.body.adminId;
+    const branchId = req.body.branchId;
+    const identifier = req.body.identifier || req.body.phone;
 
     if (!identifier || !adminId) {
       return res.status(400).json({ success: false, message: "Email/Phone and Gym ID are required" });
