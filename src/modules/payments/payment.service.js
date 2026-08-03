@@ -3,6 +3,7 @@ import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.s
 import Razorpay from "razorpay";
 import crypto from "crypto";
 import { assignPlansToMember } from "../memberPlanAssignment/memberPlanAssignment.service.js";
+import { PaymentCredentialResolver } from "../../utils/credentialResolvers.js";
 
 // --- Invoice generator ---
 function generateInvoiceNo() {
@@ -78,18 +79,15 @@ export const createRazorpayOrderService = async (data) => {
   );
   if (!member) throw { status: 404, message: "Member not found" };
 
-  // Get admin's Razorpay keys or fallback to process.env
-  const [[admin]] = await pool.query(
-    "SELECT razorpayKeyId, razorpayKeySecret FROM user WHERE id = ?",
-    [member.adminId]
-  );
-
-  const activeKeyId = (admin && admin.razorpayKeyId) ? admin.razorpayKeyId : process.env.RAZORPAY_KEY_ID;
-  const activeKeySecret = (admin && admin.razorpayKeySecret) ? admin.razorpayKeySecret : process.env.RAZORPAY_KEY_SECRET;
-
-  if (!activeKeyId || !activeKeySecret) {
+  // Get admin's Razorpay keys from the new resolver
+  const tenantCreds = await PaymentCredentialResolver.getTenantRazorpayCredentials(member.adminId);
+  
+  if (!tenantCreds || !tenantCreds.keyId || !tenantCreds.keySecret) {
     throw { status: 400, message: "Payment Gateway not configured by the Gym Owner. Please contact the Gym Owner." };
   }
+
+  const activeKeyId = tenantCreds.keyId;
+  const activeKeySecret = tenantCreds.keySecret;
 
   // --- MOCK FLOW FOR DUMMY / TEST KEYS ---
   if (activeKeyId.includes("dummy") || activeKeySecret.includes("dummy")) {
@@ -221,12 +219,12 @@ export const verifyMemberPaymentService = async (data) => {
     targetAdminId = member.adminId;
   }
 
-  const [[admin]] = await pool.query(
-    "SELECT razorpayKeySecret FROM user WHERE id = ?",
-    [targetAdminId]
-  );
+  const tenantCreds = await PaymentCredentialResolver.getTenantRazorpayCredentials(targetAdminId);
+  if (!tenantCreds || !tenantCreds.keySecret) {
+    throw { status: 400, message: "Gym Owner Payment Gateway not configured" };
+  }
 
-  const activeKeySecret = (admin && admin.razorpayKeySecret) ? admin.razorpayKeySecret : process.env.RAZORPAY_KEY_SECRET;
+  const activeKeySecret = tenantCreds.keySecret;
 
   if (!isMock && activeKeySecret && !activeKeySecret.includes("dummy") && !razorpay_order_id?.startsWith("order_mock_")) {
     const generated_signature = crypto

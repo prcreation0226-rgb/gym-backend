@@ -131,6 +131,10 @@ export const sendTemplatedNotification = async ({
     if (channels.includes("WHATSAPP")) dispatchChannels.push("WHATSAPP");
     
     if (dispatchChannels.length > 0) {
+      // Define which events are strictly platform-level system emails
+      const systemEvents = ['FORGOT_PASSWORD_OTP', 'PLAN_PURCHASED', 'PLAN_UPGRADE_REQUEST', 'SUBSCRIPTION_ACTIVATED'];
+      const isSystemEvent = systemEvents.includes(eventKey);
+
       dispatchNotification({
         category: eventKey.toLowerCase(),
         toEmail: receiverEmail,
@@ -138,7 +142,8 @@ export const sendTemplatedNotification = async ({
         toUserId: receiverId,
         subject,
         message,
-        customChannels: dispatchChannels
+        customChannels: dispatchChannels,
+        isSystemEvent
       }).catch(err => console.error(`❌ Dispatch failed for ${eventKey}:`, err.message));
     }
     

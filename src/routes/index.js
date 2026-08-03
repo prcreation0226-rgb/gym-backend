@@ -48,6 +48,7 @@ import equipmentRoutes from "../modules/inventory/equipment.routes.js";
 import automationRoutes from "../modules/appSettings/automation.routes.js";
 import creditsRoutes from "../modules/credits/credits.routes.js";
 import messageTemplateRoutes from "../modules/messageTemplates/messageTemplate.routes.js";
+import integrationsRoutes from "../modules/integrations/integrations.routes.js";
 
 const router = Router();
 
@@ -107,5 +108,6 @@ router.use("/v1/automation", automationRoutes);
 router.use("/v1/credits", creditsRoutes);
 router.use("/app-notifications", appNotificationRoutes);
 router.use("/v1/message-templates", messageTemplateRoutes);
+router.use("/integrations", integrationsRoutes);
 
 export default router;

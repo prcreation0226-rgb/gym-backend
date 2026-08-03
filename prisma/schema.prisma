@@ -641,14 +641,7 @@ model user {
   gracePeriodEndDate           DateTime?       @db.DateTime(0)
   subscriptionPlan             String?         @default("Basic") @db.VarChar(50)
   trialStatus                  String?         @default("None") @db.VarChar(50)
-  razorpayKeyId                String?         @db.VarChar(255)
-  razorpayKeySecret            String?         @db.VarChar(255)
-  whatsappAccessToken          String?         @db.VarChar(500)
-  whatsappPhoneNumberId        String?         @db.VarChar(255)
-  smtpHost                     String?         @db.VarChar(255)
-  smtpPort                     Int?
-  smtpUser                     String?         @db.VarChar(255)
-  smtpPass                     String?         @db.VarChar(255)
+  tenantIntegrationSettings    tenantintegrationsettings?
   alert                        alert[]
   branch_branch_adminIdTouser  branch[]        @relation("branch_adminIdTouser")
   classschedule                classschedule[]
@@ -800,6 +793,29 @@ model used_qr_nonces {
   member   member   @relation(fields: [memberId], references: [id])
 
   @@index([memberId], map: "used_qr_nonces_memberId_fkey")
+}
+
+model tenantintegrationsettings {
+  id                    Int       @id @default(autoincrement())
+  tenantId              Int       @unique
+  razorpayKeyId         String?   @db.VarChar(255)
+  razorpaySecret        String?   @db.VarChar(500)
+  brevoApiKey           String?   @db.VarChar(500)
+  brevoSenderEmail      String?   @db.VarChar(255)
+  brevoSenderName       String?   @db.VarChar(255)
+  whatsappAccessToken   String?   @db.VarChar(500)
+  whatsappPhoneNumberId String?   @db.VarChar(255)
+  paymentGatewayEnabled Boolean   @default(false)
+  emailEnabled          Boolean   @default(false)
+  whatsappEnabled       Boolean   @default(false)
+  isVerified            Boolean   @default(false)
+  lastVerifiedAt        DateTime? @db.DateTime(0)
+  lastTestStatus        String?   @db.VarChar(50)
+  lastTestMessage       String?   @db.Text
+  verifiedAt            DateTime? @db.DateTime(0)
+  createdAt             DateTime  @default(now()) @db.Timestamp(0)
+  updatedAt             DateTime  @updatedAt @db.Timestamp(0)
+  user                  user      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model saas_payments {

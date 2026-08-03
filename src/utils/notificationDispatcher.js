@@ -1,4 +1,5 @@
 import { pool } from "../config/db.js";
+import { BrevoCredentialResolver, WhatsAppCredentialResolver } from "./credentialResolvers.js";
 
 /**
  * Build styled HTML email
@@ -126,6 +127,7 @@ export const dispatchNotification = async ({
   message,
   customChannels,
   adminIdForCredits = null,
+  isSystemEvent = false
 }) => {
   if (!message) {
     console.warn("⚠️ Notification Dispatcher: Message is empty. Skipping.");
@@ -150,35 +152,40 @@ export const dispatchNotification = async ({
     }
   }
 
-  // ── Load admin's custom SMTP + WhatsApp credentials (if set) ──
-  let adminCreds = null;
-  // TEMPORARILY DISABLED to force use of .env
-  /*
-  if (adminId) {
-    const [rows] = await pool.query(
-      "SELECT email, smtpHost, smtpPort, smtpUser, smtpPass, whatsappAccessToken, whatsappPhoneNumberId, whatsappCredits FROM user WHERE id = ?",
-      [adminId]
-    );
-    if (rows.length > 0) adminCreds = rows[0];
+  // ── Load admin's custom credentials using new resolvers ──
+  let tenantBrevoCreds = null;
+  let isTenantContext = false;
+  
+  if (adminId && !isSystemEvent) {
+    isTenantContext = true;
+    tenantBrevoCreds = await BrevoCredentialResolver.getTenantBrevoCredentials(adminId);
   }
-  */
 
   // ════════════════════════════════════════════
   // 1.  EMAIL  →  Brevo HTTP API
   // ════════════════════════════════════════════
   if (activeChannels.includes("EMAIL") && toEmail) {
     try {
-      const clean = (val) => (val || "").toString().replace(/['"]/g, '').trim();
-      
-      const brevoApiKey = clean(process.env.BREVO_API_KEY);
-      if (!brevoApiKey) {
-        throw new Error("BREVO_API_KEY is not configured.");
+      let brevoApiKey = null;
+      let mailFrom = null;
+
+      if (isTenantContext) {
+        if (!tenantBrevoCreds) {
+          throw new Error("Gym Owner Email service is not configured.");
+        }
+        brevoApiKey = tenantBrevoCreds.apiKey;
+        mailFrom = `${tenantBrevoCreds.senderName} <${tenantBrevoCreds.senderEmail}>`;
+      } else {
+        const platformCreds = BrevoCredentialResolver.getSuperAdminBrevoCredentials();
+        if (!platformCreds.apiKey) {
+           throw new Error("Platform BREVO_API_KEY is not configured.");
+        }
+        brevoApiKey = platformCreds.apiKey;
+        mailFrom = `${platformCreds.senderName} <${platformCreds.senderEmail}>`;
       }
 
-      const envMailFrom = clean(process.env.MAIL_FROM);
-      const mailFrom = envMailFrom 
-        ? envMailFrom 
-        : (adminCreds?.email ? `GymSoft <${adminCreds.email}>` : "GymSoft <noreply@gymsoftware.space>");
+      const clean = (val) => (val || "").toString().replace(/['"]/g, '').trim();
+      brevoApiKey = clean(brevoApiKey);
 
       let senderName = "GymSoft";
       let senderEmail = "noreply@gymsoftware.space";
@@ -228,63 +235,9 @@ export const dispatchNotification = async ({
   }
 
   // ════════════════════════════════════════════
-  // 2.  WHATSAPP  →  Meta Cloud API
+  // 2.  WHATSAPP  (Removed as per request)
   // ════════════════════════════════════════════
   let fallbackToAppPush = false;
-
-  if (activeChannels.includes("WHATSAPP") && toPhone) {
-    try {
-      const customToken = adminCreds?.whatsappAccessToken || null;
-      const customPhoneId = adminCreds?.whatsappPhoneNumberId || null;
-      let credits = adminCreds?.whatsappCredits ?? 999; // treat missing as unlimited
-
-      if (adminId) {
-        // Credit-based flow (if admin has credits configured)
-        const [creditRows] = await pool.query("SELECT whatsappCredits FROM user WHERE id = ?", [adminId]);
-        credits = creditRows[0]?.whatsappCredits ?? 999;
-      }
-
-      if (credits > 0 || credits === 999) {
-        const cleanPhone = toPhone.trim().replace(/\D/g, "");
-        const isSent = await sendWhatsAppViaMetaApi(cleanPhone, message, customToken, customPhoneId);
-
-        if (isSent && adminId && credits !== 999) {
-          // Deduct credit
-          await pool.query("UPDATE user SET whatsappCredits = whatsappCredits - 1 WHERE id = ?", [adminId]);
-          credits -= 1;
-
-          // Log credit usage
-          await pool.query(
-            "INSERT INTO whatsapp_credit_transactions (userId, creditsUsed, transactionType, description) VALUES (?, 1, 'USAGE', ?)",
-            [adminId, "Sent WhatsApp to " + cleanPhone]
-          ).catch(() => {});
-
-          // Low credit alert
-          const [autoRows] = await pool.query("SELECT lowCreditThreshold FROM automation_settings LIMIT 1").catch(() => [[{}]]);
-          const threshold = autoRows[0]?.lowCreditThreshold || 50;
-          if (credits <= threshold) {
-            await pool.query(
-              "INSERT INTO notificationlog (type, `to`, message, status) VALUES (?, ?, ?, ?)",
-              ["IN-APP", adminId.toString(), `⚠️ Low WhatsApp Credits: Only ${credits} remaining. Please recharge.`, "UNREAD"]
-            ).catch(() => {});
-          }
-        }
-
-        await pool.query(
-          "INSERT INTO notificationlog (type, `to`, message, memberId, status) VALUES (?, ?, ?, ?, ?)",
-          ["WHATSAPP", toPhone, message, memberId || null, isSent ? "SENT" : "FAILED"]
-        );
-        results.whatsapp = { success: isSent };
-      } else {
-        console.warn(`⚠️ WhatsApp credits exhausted for Admin ${adminId}. Falling back to App Push.`);
-        fallbackToAppPush = true;
-        results.whatsapp = { success: false, reason: "Insufficient Credits" };
-      }
-    } catch (err) {
-      console.error(`❌ WhatsApp dispatch failed for ${toPhone}:`, err.message);
-      results.whatsapp = { success: false, error: err.message };
-    }
-  }
 
   // ════════════════════════════════════════════
   // 3.  IN_APP / APP_PUSH  →  Bell Icon

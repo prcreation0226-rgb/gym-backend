@@ -5,12 +5,14 @@ import bcrypt from "bcryptjs";
 import { sendTemplatedNotification } from "../messageTemplates/messageTemplate.service.js";
 import Razorpay from "razorpay";
 import crypto from "crypto";
+import { PaymentCredentialResolver } from "../../utils/credentialResolvers.js";
 
 export const createRazorpayOrder = async (req, res) => {
   try {
     const { amount } = req.body;
-    const activeKeyId = process.env.RAZORPAY_KEY_ID;
-    const activeKeySecret = process.env.RAZORPAY_KEY_SECRET;
+    const creds = PaymentCredentialResolver.getSuperAdminRazorpayCredentials();
+    const activeKeyId = creds.keyId;
+    const activeKeySecret = creds.keySecret;
 
     if (!activeKeyId || !activeKeySecret) {
       return res.status(400).json({ success: false, message: "Superadmin Razorpay keys not configured." });
@@ -65,7 +67,8 @@ export const verifyRazorpayPayment = async (req, res) => {
       delete purchaseData.isMock;
     }
 
-    const activeKeySecret = process.env.RAZORPAY_KEY_SECRET;
+    const creds = PaymentCredentialResolver.getSuperAdminRazorpayCredentials();
+    const activeKeySecret = creds.keySecret;
 
     if (!isMock && activeKeySecret && !activeKeySecret.includes("dummy") && !razorpay_order_id?.startsWith("order_mock_")) {
       const generated_signature = crypto
