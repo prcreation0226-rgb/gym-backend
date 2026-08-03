@@ -41,7 +41,7 @@ export const BrevoCredentialResolver = {
   getSuperAdminBrevoCredentials: () => {
     return {
       apiKey: process.env.BREVO_API_KEY,
-      senderEmail: process.env.MAIL_FROM_EMAIL || "noreply@gymsoft.com",
+      senderEmail: process.env.MAIL_FROM_EMAIL || process.env.MAIL_FROM || "noreply@gymsoft.com",
       senderName: process.env.MAIL_FROM_NAME || "GymSoft Platform",
     };
   },

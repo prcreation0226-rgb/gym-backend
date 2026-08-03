@@ -215,12 +215,22 @@ export const dispatchNotification = async ({
         throw new Error(`Brevo API Error: ${JSON.stringify(errorData)}`);
       }
 
+      const responseData = await response.json();
+      
+      console.log("SMTP RESULT:", {
+        NotificationType: category,
+        Recipient: toEmail,
+        Subject: subject,
+        MessageId: responseData.messageId || null,
+        Status: "Accepted by Brevo API",
+        SenderUsed: senderEmail
+      });
+
       await pool.query(
         "INSERT INTO notificationlog (type, `to`, message, memberId, status) VALUES (?, ?, ?, ?, ?)",
         ["EMAIL", toEmail, message, memberId || null, "SENT"]
       );
-      results.email = { success: true };
-      console.log(`✉️ Email sent to ${toEmail}`);
+      results.email = { success: true, messageId: responseData.messageId };
     } catch (err) {
       console.error(`❌ Email failed for ${toEmail}:`, err.message);
       results.email = { success: false, error: err.message };
