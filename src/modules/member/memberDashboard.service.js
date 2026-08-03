@@ -26,7 +26,7 @@ export const getMemberDashboardService = async (memberId, adminId) => {
   
   // Check for pending payments first
   const [[pendingPayment]] = await pool.query(
-    `SELECT status FROM payment WHERE memberId = ? AND status = 'Pending' ORDER BY createdAt DESC LIMIT 1`,
+    `SELECT status FROM payment WHERE memberId = ? AND status = 'Pending' ORDER BY id DESC LIMIT 1`,
     [memberId]
   );
   
