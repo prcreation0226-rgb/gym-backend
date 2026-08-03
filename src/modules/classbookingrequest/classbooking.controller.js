@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { dispatchNotification } from "../../utils/notificationDispatcher.js";
 import { sendAppNotification } from "../../utils/notificationHelper.js";
 import { getIO, emitToUser } from "../../config/socket.js";
+import { uploadToCloudinary } from "../../config/cloudinary.js";
 
 const generate6DigitPassword = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -33,6 +34,11 @@ export const createBookingRequest = async (req, res) => {
       paymentMode = "Cash",
       userId = null
     } = req.body;
+
+    let paymentProofImage = null;
+    if (req.files && req.files.paymentProofImage) {
+      paymentProofImage = await uploadToCloudinary(req.files.paymentProofImage, "gym/payment-proofs");
+    }
 
     /* -------------------------
        1️⃣ BASIC VALIDATION
@@ -235,6 +241,8 @@ export const getBookingRequestsForAdmin = async (req, res) => {
         br.createdAt,
         br.price,
         br.upiId,
+        br.paymentMode,
+        br.paymentProofImage,
 
         u.id AS userId,
         u.fullName AS userName,
