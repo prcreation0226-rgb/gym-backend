@@ -93,7 +93,8 @@ export const allPayments = async (req, res, next) => {
   try {
     const branchId = req.params.branchId;
     const adminId = req.query.adminId; // Need adminId from query for proper fetching
-    const list = await allPaymentsService(adminId, branchId);
+    const { startDate, endDate } = req.query;
+    const list = await allPaymentsService(adminId, branchId, startDate, endDate);
     res.json({ success: true, payments: list });
   } catch (err) {
     next(err);

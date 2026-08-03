@@ -155,8 +155,9 @@ export const paymentHistoryService = async (memberId) => {
 };
 
 // --- ALL PAYMENTS BY ADMIN/BRANCH ---
-export const allPaymentsService = async (adminId, branchId) => {
+export const allPaymentsService = async (adminId, branchId, startDate, endDate) => {
   const hasBranchFilter = branchId && branchId !== 'all' && branchId !== '' && branchId !== 'null' && branchId !== 'undefined';
+  const hasDateFilter = startDate && endDate;
 
   let query = `
     SELECT 
@@ -175,7 +176,9 @@ export const allPaymentsService = async (adminId, branchId) => {
     JOIN member m ON p.memberId = m.id
     LEFT JOIN memberplan mp ON p.planId = mp.id
     LEFT JOIN plan pl ON p.planId = pl.id
-    WHERE m.adminId = ? ${hasBranchFilter ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
+    WHERE m.adminId = ? 
+      ${hasBranchFilter ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
+      ${hasDateFilter ? "AND DATE(p.paymentDate) BETWEEN ? AND ?" : ""}
 
     UNION ALL
 
@@ -194,14 +197,30 @@ export const allPaymentsService = async (adminId, branchId) => {
     FROM member m
     LEFT JOIN memberplan mp ON m.planId = mp.id
     LEFT JOIN plan pl ON m.planId = pl.id
-    WHERE m.adminId = ? AND m.amountPaid > 0 ${hasBranchFilter ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
+    WHERE m.adminId = ? AND m.amountPaid > 0 
+      ${hasBranchFilter ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
+      ${hasDateFilter ? "AND DATE(m.joinDate) BETWEEN ? AND ?" : ""}
 
     ORDER BY paymentDate DESC
   `;
 
-  const params = hasBranchFilter 
-    ? [adminId, branchId, adminId, branchId] 
-    : [adminId, adminId];
+  const params = [];
+  
+  // First query (payment table)
+  params.push(adminId);
+  if (hasBranchFilter) params.push(branchId);
+  if (hasDateFilter) {
+    params.push(new Date(startDate).toISOString().slice(0, 10));
+    params.push(new Date(endDate).toISOString().slice(0, 10));
+  }
+
+  // Second query (member registration payments)
+  params.push(adminId);
+  if (hasBranchFilter) params.push(branchId);
+  if (hasDateFilter) {
+    params.push(new Date(startDate).toISOString().slice(0, 10));
+    params.push(new Date(endDate).toISOString().slice(0, 10));
+  }
 
   const [rows] = await pool.query(query, params);
   return rows;

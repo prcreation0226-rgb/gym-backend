@@ -517,7 +517,7 @@ export const memberCheckOut = async (req, res, next) => {
 ------------------------------------------------------ */
 export const getDailyAttendance = async (req, res, next) => {
   try {
-    const { date, search, branchId } = req.query;
+    const { startDate, endDate, date, search, branchId } = req.query;
 
     let sql = `
       SELECT 
@@ -543,7 +543,12 @@ export const getDailyAttendance = async (req, res, next) => {
       params.push(branchId);
     }
 
-    if (date) {
+    if (startDate && endDate) {
+      const mysqlStart = new Date(startDate).toISOString().slice(0, 10);
+      const mysqlEnd = new Date(endDate).toISOString().slice(0, 10);
+      sql += ` AND DATE(a.checkIn) BETWEEN ? AND ?`;
+      params.push(mysqlStart, mysqlEnd);
+    } else if (date) {
       const mysqlDate = new Date(date).toISOString().slice(0, 10);
       sql += ` AND DATE(a.checkIn) = ?`;
       params.push(mysqlDate);
