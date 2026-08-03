@@ -169,10 +169,7 @@ export const dispatchNotification = async ({
       let brevoApiKey = null;
       let mailFrom = null;
 
-      if (isTenantContext) {
-        if (!tenantBrevoCreds) {
-          throw new Error("Gym Owner Email service is not configured.");
-        }
+      if (isTenantContext && tenantBrevoCreds) {
         brevoApiKey = tenantBrevoCreds.apiKey;
         mailFrom = `${tenantBrevoCreds.senderName} <${tenantBrevoCreds.senderEmail}>`;
       } else {

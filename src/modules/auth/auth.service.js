@@ -144,6 +144,7 @@ export const registerUser = async (data,payload) => {
       toUserId: result.insertId,
       subject: welcomeTemplate.subject || "Welcome to GymSoft!",
       message: msgBody,
+      isSystemEvent: true
     }).catch(err => console.error("❌ Error sending admin trial welcome notification:", err.message));
   } else if (roleId == 2 || roleId == '2') {
     // Admin registered without trial – still send a welcome email with credentials
@@ -155,6 +156,7 @@ export const registerUser = async (data,payload) => {
       toUserId: result.insertId,
       subject: "Your Gym Admin Account — GymSoft",
       message: credMsg,
+      isSystemEvent: true
     }).catch(err => console.error("❌ Error sending admin welcome email:", err.message));
   }
 
@@ -195,6 +197,22 @@ export const registerUser = async (data,payload) => {
 
   if (roleId === 2 || roleId === '2') {
     notifySuperAdmin(`New Admin created: ${fullName} (${email}) for Gym: ${gymName || 'N/A'}`, 'IN-APP');
+    
+    // Log purchase record for SuperAdmin payments tab
+    try {
+      const paymentMethod = data.paymentMethod || 'Cash';
+      const paymentDetails = data.razorpay_payment_id || data.transactionId || null;
+      const [purchaseRes] = await pool.query(
+        `INSERT INTO purchase (selectedPlan, companyName, email, billingDuration, startDate, amount, phone, adminName, branchName, gstNumber, city, paymentMethod, paymentDetails, status) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'APPROVED')`,
+        [planName, gymName, email, duration || 'Not Specified', new Date(), price || 0, phone || "", fullName || "", "Head Branch", gstNumber || null, null, paymentMethod, paymentDetails]
+      );
+      const purchaseId = purchaseRes.insertId;
+      const transactionId = paymentDetails || `PAY-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(purchaseId).padStart(4, '0')}`;
+      await pool.query(`UPDATE purchase SET transactionId = ? WHERE id = ?`, [transactionId, purchaseId]);
+    } catch (purchaseErr) {
+      console.error("❌ Failed to log purchase for admin creation:", purchaseErr.message);
+    }
   }
 
   return newUser;

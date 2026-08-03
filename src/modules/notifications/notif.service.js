@@ -697,31 +697,24 @@ export const deleteAnnouncementService = async (id, adminId) => {
 export const notifySuperAdmin = async (message, type = "SYSTEM_ALERT") => {
   try {
     // Find superadmin (roleId = 1) and sub-admins (roleId = 9)
-    const [superAdmins] = await pool.query(`SELECT id FROM user WHERE roleId IN (1, 9) AND status = 'Active'`);
+    const [superAdmins] = await pool.query(`SELECT id, email, phone FROM user WHERE roleId IN (1, 9) AND LOWER(status) = 'active'`);
     
     if (superAdmins.length === 0) return; // No superadmin found
 
     for (const sa of superAdmins) {
       const superAdminId = sa.id;
       
-      // Save in notificationlog
-      const [logResult] = await pool.query(
-        `INSERT INTO notificationlog (type, \`to\`, message, status, createdAt)
-         VALUES (?, ?, ?, ?, NOW())`,
-        [type, superAdminId.toString(), message, "UNREAD"]
-      );
-
-      const notifData = {
-        id: logResult.insertId,
-        type,
-        to: superAdminId.toString(),
-        message,
-        status: "UNREAD",
-        createdAt: new Date().toISOString()
-      };
-
-      // Emit real-time via Socket.io
-      emitToUser(superAdminId, "new_notification", notifData);
+      // Dispatch both IN-APP and EMAIL notification to SuperAdmin
+      dispatchNotification({
+        category: "saas_renewal_channel",
+        toEmail: sa.email,
+        toPhone: sa.phone || null,
+        toUserId: superAdminId,
+        subject: "SuperAdmin Alert — GymSoft",
+        message: message,
+        isSystemEvent: true, // Use platform credentials
+        customChannels: ["IN_APP", "EMAIL"] // Force both channels
+      }).catch(err => console.error("❌ Failed to notify SuperAdmin via dispatchNotification:", err.message));
     }
   } catch (err) {
     console.error("❌ Failed to notify SuperAdmin:", err.message);

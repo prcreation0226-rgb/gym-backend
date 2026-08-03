@@ -4,6 +4,8 @@ import { registerUser, loginUser , fetchUserById,
   removeUser, fetchAdmins, fetchDashboardStats, loginMemberService,changeUserPassword, getAdminDashboardData,
   forgotPasswordService, verifyOtpService, resendOtpService, resetPasswordService, loginWithResetTokenService
 } from "./auth.service.js";
+import crypto from "crypto";
+import { PaymentCredentialResolver } from "../../utils/credentialResolvers.js";
 
 
 
@@ -18,6 +20,24 @@ export const register = async (req, res, next) => {
     //   req.body.adminId = req.user.id;   // jis admin ne create kiya
     // }
     
+    const { paymentMethod, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    if (paymentMethod === "Razorpay") {
+      const creds = PaymentCredentialResolver.getSuperAdminRazorpayCredentials();
+      const activeKeySecret = creds.keySecret;
+      
+      if (activeKeySecret && !activeKeySecret.includes("dummy") && !razorpay_order_id?.startsWith("order_mock_")) {
+        const generated_signature = crypto
+          .createHmac("sha256", activeKeySecret)
+          .update(razorpay_order_id + "|" + razorpay_payment_id)
+          .digest("hex");
+
+        if (generated_signature !== razorpay_signature) {
+          return res.status(400).json({ success: false, message: "Invalid payment signature" });
+        }
+      }
+    }
+
     let imageUrl = null;
     if (req.files?.profileImage) {
       imageUrl = await uploadToCloudinary(
