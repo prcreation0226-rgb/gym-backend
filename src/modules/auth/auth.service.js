@@ -1389,7 +1389,7 @@ const recentActivitiesQuery = `
   const [upcomingExpiries] = await pool.query(
     `SELECT m.id, m.fullName, m.email, m.phone, m.membershipTo, p.name AS planName 
      FROM member m
-     LEFT JOIN plan p ON m.planId = p.id
+     LEFT JOIN memberplan p ON m.planId = p.id
      WHERE m.adminId = ?
        ${bId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
        AND m.membershipTo IS NOT NULL
