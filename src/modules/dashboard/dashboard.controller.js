@@ -290,18 +290,30 @@ export const getSalesDashboard = async (req, res, next) => {
     const [incomeData] = await pool.query(
       `
       SELECT 
-        DATE_FORMAT(m.joinDate, '%b') AS month,
-        YEAR(m.joinDate) AS year,
-        MONTH(m.joinDate) AS monthNum,
-        SUM(m.amountPaid) AS total
-      FROM member m
-      WHERE m.adminId = ?
-        ${branchId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
-        AND m.joinDate >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL (? - 1) MONTH), '%Y-%m-01')
+        DATE_FORMAT(d.date, '%b') AS month,
+        YEAR(d.date) AS year,
+        MONTH(d.date) AS monthNum,
+        SUM(d.amount) AS total
+      FROM (
+        SELECT joinDate AS date, COALESCE(amountPaid, 0) AS amount
+        FROM member
+        WHERE adminId = ?
+          ${branchId ? "AND (branchId = ? OR branchId IS NULL)" : ""}
+          AND joinDate >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL (? - 1) MONTH), '%Y-%m-01')
+          
+        UNION ALL
+        
+        SELECT p.paymentDate AS date, COALESCE(p.amount, 0) AS amount
+        FROM payment p
+        JOIN member m ON p.memberId = m.id
+        WHERE m.adminId = ?
+          ${branchId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
+          AND p.paymentDate >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL (? - 1) MONTH), '%Y-%m-01')
+      ) d
       GROUP BY year, month, monthNum
       ORDER BY year, monthNum
       `,
-      periodParams
+      [...periodParams, ...periodParams]
     );
 
     // Expenses
