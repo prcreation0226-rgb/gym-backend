@@ -784,17 +784,17 @@ await pool.query(
   // ⭐ 5) Delete members where user is assigned
   await pool.query("DELETE FROM member WHERE userId = ?", [userId]); // <-- added
 
-  // ⭐ 6) Set adminId = NULL in memberplan (not delete)
+  // ⭐ 6) Delete memberplan where user is admin
   await pool.query(
-    "UPDATE memberplan SET adminId = NULL WHERE adminId = ?",
+    "DELETE FROM memberplan WHERE adminId = ?",
     [userId]
-  ); // <-- added
+  );
 
-  // ⭐ 7) Set adminId = NULL in branch (not delete)
+  // ⭐ 7) Delete branch where user is admin
   await pool.query(
-    "UPDATE branch SET adminId = NULL WHERE adminId = ?",
+    "DELETE FROM branch WHERE adminId = ?",
     [userId]
-  ); // <-- added
+  );
 
   // ⭐ 8) Finally delete user
   await pool.query("DELETE FROM user WHERE id = ?", [userId]); // <-- unchanged
