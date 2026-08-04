@@ -148,8 +148,8 @@ export const registerUser = async (data,payload) => {
       customChannels: ["EMAIL", "IN_APP"]
     }).catch(err => console.error("❌ Error sending admin trial welcome notification:", err.message));
   } else if (roleId == 2 || roleId == '2') {
-    // Admin registered without trial – still send a welcome email with credentials
-    const credMsg = `Hi ${fullName},\n\nYour gym admin account has been created successfully.\n\nLogin Details:\nEmail: ${email}\nPassword: ${data.password}\n\nGym: ${gymName || 'N/A'}\n\nRegards,\nGymSoft Team`;
+    // Admin registered without trial – still send a welcome email with credentials and plan details
+    const credMsg = `Hi ${fullName},\n\nYour gym admin account has been created successfully.\n\nLogin Details:\nEmail: ${email}\nPassword: ${data.password}\n\nGym: ${gymName || 'N/A'}\n\nPlan Details:\nPlan Name: ${planName || 'N/A'}\nPrice: ₹${price || 0}\nDuration: ${duration || 'N/A'}\n\nRegards,\nGymSoft Team`;
     dispatchNotification({
       category: "saas_renewal_channel",
       toEmail: email,
@@ -165,9 +165,10 @@ export const registerUser = async (data,payload) => {
   // ✅ Send IN-APP Welcome Notification to Dashboard
   if (roleId == 2 || roleId == '2') {
     try {
+      const inAppMsg = `Hi ${fullName}, welcome aboard! We are excited to have ${gymName || 'your gym'} with us. You have successfully subscribed to the ${planName || 'N/A'} plan (₹${price || 0} for ${duration || 'N/A'}). Let's get started!`;
       await pool.query(
         "INSERT INTO app_notification (tenantId, senderId, receiverId, receiverRole, type, title, message, referenceType, referenceId, isRead, createdAt) VALUES (?, NULL, ?, 'Admin', 'SYSTEM_ALERT', 'Welcome to GymSoft!', ?, 'SYSTEM', '1', FALSE, NOW())",
-        [result.insertId, result.insertId, `Hi ${fullName}, welcome aboard! We are excited to have ${gymName || 'your gym'} with us. Let's get started!`]
+        [result.insertId, result.insertId, inAppMsg]
       );
     } catch (e) {
       console.error("❌ Failed to insert in-app welcome notification:", e.message);
