@@ -784,6 +784,14 @@ await pool.query(
   // ⭐ 5) Delete members where user is assigned
   await pool.query("DELETE FROM member WHERE userId = ?", [userId]); // <-- added
 
+  // ⭐ 5.5) Delete member_plan_assignment where plan belongs to admin
+  await pool.query(`
+    DELETE mpa
+    FROM member_plan_assignment mpa
+    INNER JOIN memberplan p ON p.id = mpa.planId
+    WHERE p.adminId = ?
+  `, [userId]);
+
   // ⭐ 6) Delete memberplan where user is admin
   await pool.query(
     "DELETE FROM memberplan WHERE adminId = ?",
