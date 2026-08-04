@@ -226,13 +226,13 @@ export const getSalesDashboard = async (req, res, next) => {
           FROM payment p
           JOIN member m ON p.memberId = m.id
           WHERE m.adminId = ? ${branchId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
-            AND p.paymentDate >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+            AND p.paymentDate >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL (? - 1) MONTH), '%Y-%m-01')
         ), 0) +
         COALESCE((
           SELECT SUM(m.amountPaid)
           FROM member m
           WHERE m.adminId = ? ${branchId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
-            AND m.joinDate >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+            AND m.joinDate >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL (? - 1) MONTH), '%Y-%m-01')
         ), 0)
       ) AS total
       `,
@@ -250,7 +250,7 @@ export const getSalesDashboard = async (req, res, next) => {
       FROM member m
       WHERE m.adminId = ?
         ${branchId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
-        AND m.joinDate >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+        AND m.joinDate >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL (? - 1) MONTH), '%Y-%m-01')
       `,
       periodParams
     );
@@ -297,7 +297,7 @@ export const getSalesDashboard = async (req, res, next) => {
       FROM member m
       WHERE m.adminId = ?
         ${branchId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
-        AND m.joinDate >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+        AND m.joinDate >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL (? - 1) MONTH), '%Y-%m-01')
       GROUP BY year, month, monthNum
       ORDER BY year, monthNum
       `,
@@ -316,7 +316,7 @@ export const getSalesDashboard = async (req, res, next) => {
       JOIN branch b ON e.branchId = b.id
       WHERE b.adminId = ?
         ${branchId ? "AND (e.branchId = ? OR e.branchId IS NULL)" : ""}
-        AND e.date >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+        AND e.date >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL (? - 1) MONTH), '%Y-%m-01')
       GROUP BY year, month, monthNum
       ORDER BY year, monthNum
       `,
