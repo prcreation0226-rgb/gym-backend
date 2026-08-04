@@ -804,6 +804,15 @@ await pool.query(
     [userId]
   );
 
+  // ⭐ 7.1) Delete tenant integrations
+  await pool.query("DELETE FROM tenantintegrationsettings WHERE tenantId = ?", [userId]);
+
+  // ⭐ 7.2) Delete leads
+  await pool.query("DELETE FROM leads WHERE adminId = ?", [userId]);
+
+  // ⭐ 7.3) Delete saas_payments
+  await pool.query("DELETE FROM saas_payments WHERE adminId = ?", [userId]);
+
   // ⭐ 8) Finally delete user
   await pool.query("DELETE FROM user WHERE id = ?", [userId]); // <-- unchanged
 
