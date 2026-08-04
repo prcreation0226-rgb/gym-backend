@@ -144,7 +144,8 @@ export const registerUser = async (data,payload) => {
       toUserId: result.insertId,
       subject: welcomeTemplate.subject || "Welcome to GymSoft!",
       message: msgBody,
-      isSystemEvent: true
+      isSystemEvent: true,
+      customChannels: ["EMAIL", "IN_APP"]
     }).catch(err => console.error("❌ Error sending admin trial welcome notification:", err.message));
   } else if (roleId == 2 || roleId == '2') {
     // Admin registered without trial – still send a welcome email with credentials
@@ -156,7 +157,8 @@ export const registerUser = async (data,payload) => {
       toUserId: result.insertId,
       subject: "Your Gym Admin Account — GymSoft",
       message: credMsg,
-      isSystemEvent: true
+      isSystemEvent: true,
+      customChannels: ["EMAIL", "IN_APP"]
     }).catch(err => console.error("❌ Error sending admin welcome email:", err.message));
   }
 
@@ -164,7 +166,7 @@ export const registerUser = async (data,payload) => {
   if (roleId == 2 || roleId == '2') {
     try {
       await pool.query(
-        "INSERT INTO app_notification (tenantId, receiverId, receiverRole, type, title, message, referenceType, referenceId, isRead, createdAt) VALUES (?, ?, 'Admin', 'SYSTEM_ALERT', 'Welcome to GymSoft!', ?, 'SYSTEM', '1', FALSE, NOW())",
+        "INSERT INTO app_notification (tenantId, senderId, receiverId, receiverRole, type, title, message, referenceType, referenceId, isRead, createdAt) VALUES (?, NULL, ?, 'Admin', 'SYSTEM_ALERT', 'Welcome to GymSoft!', ?, 'SYSTEM', '1', FALSE, NOW())",
         [result.insertId, result.insertId, `Hi ${fullName}, welcome aboard! We are excited to have ${gymName || 'your gym'} with us. Let's get started!`]
       );
     } catch (e) {
@@ -212,6 +214,28 @@ export const registerUser = async (data,payload) => {
       await pool.query(`UPDATE purchase SET transactionId = ? WHERE id = ?`, [transactionId, purchaseId]);
     } catch (purchaseErr) {
       console.error("❌ Failed to log purchase for admin creation:", purchaseErr.message);
+    }
+
+    // ✅ Notify SuperAdmin via EMAIL with Plan details
+    try {
+      const [saResult] = await pool.query("SELECT id, email FROM user WHERE roleId = 1 LIMIT 1");
+      if (saResult.length > 0) {
+        const saEmail = saResult[0].email;
+        const saId = saResult[0].id;
+        const saMsg = `Hello Super Admin,\n\nA new admin has registered and taken a plan.\n\nAdmin Details:\nName: ${fullName}\nEmail: ${email}\nPhone: ${phone || 'N/A'}\nGym Name: ${gymName || 'N/A'}\n\nPlan Details:\nPlan Name: ${planName || 'N/A'}\nPrice: ₹${price || 0}\nDuration: ${duration || 'N/A'}\n\nPlease check the dashboard for more details.\n\nRegards,\nGymSoft Team`;
+        
+        await dispatchNotification({
+          category: "saas_renewal_channel",
+          toEmail: saEmail,
+          toUserId: saId,
+          subject: "New Admin Registration & Plan Details",
+          message: saMsg,
+          isSystemEvent: true,
+          customChannels: ["EMAIL", "IN_APP"]
+        });
+      }
+    } catch (e) {
+      console.error("❌ Failed to send superadmin plan email", e.message);
     }
   }
 
