@@ -1383,6 +1383,21 @@ const recentActivitiesQuery = `
   const monthlyExpenses = Number(monthExpRow?.total || 0) + Number(monthSalRow?.total || 0);
   const monthlyProfit = monthlyRevenue - monthlyExpenses;
 
+  const upcomingExpiriesParams = [adminId];
+  if (bId) upcomingExpiriesParams.push(bId);
+
+  const [upcomingExpiries] = await pool.query(
+    `SELECT m.id, m.fullName, m.email, m.phone, m.membershipTo, p.name AS planName 
+     FROM member m
+     LEFT JOIN plan p ON m.planId = p.id
+     WHERE m.adminId = ?
+       ${bId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
+       AND m.membershipTo IS NOT NULL
+       AND m.membershipTo BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+     ORDER BY m.membershipTo ASC`,
+    upcomingExpiriesParams
+  );
+
   return {
     ...stats[0],
     memberGrowth,
@@ -1392,7 +1407,8 @@ const recentActivitiesQuery = `
     recentPayments,
     monthlyRevenue,
     monthlyExpenses,
-    monthlyProfit
+    monthlyProfit,
+    upcomingExpiries
   };
 };
 
