@@ -1181,11 +1181,22 @@ const recentActivitiesQuery = `
       ${dateFormatRevenue} AS month,
       MIN(p.paymentDate) AS rawDate,
       SUM(p.amount) AS totalRevenue
-    FROM payment p
-    JOIN member m ON p.memberId = m.id
-    WHERE m.adminId = ?
-      ${bId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
-      AND p.paymentDate >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+    FROM (
+      SELECT m.joinDate AS paymentDate, COALESCE(m.amountPaid, 0) AS amount
+      FROM member m
+      WHERE m.adminId = ?
+        ${bId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
+        AND m.joinDate >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+        
+      UNION ALL
+      
+      SELECT pt.paymentDate AS paymentDate, COALESCE(pt.amount, 0) AS amount
+      FROM payment pt
+      JOIN member mt ON pt.memberId = mt.id
+      WHERE mt.adminId = ?
+        ${bId ? "AND (mt.branchId = ? OR mt.branchId IS NULL)" : ""}
+        AND pt.paymentDate >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+    ) p
     GROUP BY ${groupByRevenue}
     ORDER BY ${orderByRevenue};
   `;
@@ -1270,7 +1281,10 @@ const recentActivitiesQuery = `
   const revenueParams = [adminId];
   if (bId) revenueParams.push(bId);
   revenueParams.push(chartPeriod);
-  const [revenueGrowth] = await pool.query(revenueGrowthQuery, revenueParams);
+  
+  const fullRevenueParams = [...revenueParams, ...revenueParams];
+  const [revenueGrowth] = await pool.query(revenueGrowthQuery, fullRevenueParams);
+  
   const [expenseGrowth] = await pool.query(expenseGrowthQuery, revenueParams);
   const [salaryGrowth] = await pool.query(salaryGrowthQuery, revenueParams);
 
@@ -1300,13 +1314,24 @@ const recentActivitiesQuery = `
   const monthFilter = `${targetMonth}-01`;
 
   const [[monthRevRow]] = await pool.query(
-    `SELECT COALESCE(SUM(p.amount), 0) AS total 
-     FROM payment p
-     JOIN member m ON p.memberId = m.id
-     WHERE m.adminId = ?
-       ${bId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
-       AND DATE_FORMAT(p.paymentDate, '%Y-%m') = ?`,
-    bId ? [adminId, bId, targetMonth] : [adminId, targetMonth]
+    `SELECT (
+       COALESCE((
+         SELECT SUM(p.amount)
+         FROM payment p
+         JOIN member m ON p.memberId = m.id
+         WHERE m.adminId = ?
+           ${bId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
+           AND DATE_FORMAT(p.paymentDate, '%Y-%m') = ?
+       ), 0) +
+       COALESCE((
+         SELECT SUM(m.amountPaid)
+         FROM member m
+         WHERE m.adminId = ?
+           ${bId ? "AND (m.branchId = ? OR m.branchId IS NULL)" : ""}
+           AND DATE_FORMAT(m.joinDate, '%Y-%m') = ?
+       ), 0)
+     ) AS total`,
+    bId ? [adminId, bId, targetMonth, adminId, bId, targetMonth] : [adminId, targetMonth, adminId, targetMonth]
   ).catch(() => [[{ total: 0 }]]);
 
   const monthlyRevenue = Number(monthRevRow?.total || 0);
